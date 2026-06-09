@@ -4,6 +4,9 @@ import type { ToolDef } from "./types.js";
 export const projectReadTools: ToolDef[] = [
   {
     name: "list_projects",
+    // Swagger mis-types GET /project/get-all's 200 as a single project, but the
+    // API returns an array. We pass the JSON through verbatim — do not "fix" this
+    // into single-object handling (see Phase 1 spec, caveat 3).
     description:
       "List projects. Optional filters: customerID (only that customer's projects) and isActive (true = active projects only). Returns the raw TimeLog project list.",
     inputSchema: {
