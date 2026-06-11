@@ -1,5 +1,13 @@
 import { z } from "zod";
 import type { ToolDef } from "./types.js";
+import { loadClassificationCache } from "../classificationCache.js";
+
+// The live list endpoints wrap rows as { Entities: [{ Properties: {...} }] }.
+function unwrapEntities(resp: unknown): Record<string, unknown>[] {
+  const entities = (resp as { Entities?: { Properties?: Record<string, unknown> }[] })?.Entities;
+  if (!Array.isArray(entities)) return [];
+  return entities.map((e) => e.Properties ?? {}).filter(Boolean) as Record<string, unknown>[];
+}
 
 export const projectReadTools: ToolDef[] = [
   {
@@ -29,9 +37,29 @@ export const projectReadTools: ToolDef[] = [
   },
   {
     name: "list_project_types",
-    description: "List all Project Types (read-only classification). Use to resolve a type name to its ProjectTypeID.",
+    description:
+      "List all Project Types (read-only classification) to resolve a type name to its ProjectTypeID. Merges the live API result with a local cache, because the TimeLog API caps the list at 10 records and has no working paging (workaround — see data/classification-cache.json).",
     inputSchema: {},
-    handler: (client) => client.get("/ProjectType"),
+    handler: async (client) => {
+      const live = unwrapEntities(await client.get("/ProjectType"));
+      const cache = loadClassificationCache().projectTypes;
+      const byId = new Map<number, { ProjectTypeID: number; Name: string; source: string }>();
+      for (const c of cache) {
+        byId.set(c.id, { ProjectTypeID: c.id, Name: c.name, source: "cache" });
+      }
+      for (const l of live) {
+        const id = l.ProjectTypeID as number;
+        const name = String(l.Name ?? "").trim();
+        byId.set(id, { ProjectTypeID: id, Name: name, source: byId.has(id) ? "both" : "live" });
+      }
+      const projectTypes = [...byId.values()].sort((a, b) => a.Name.localeCompare(b.Name, "da"));
+      return {
+        note: "Merged live API result with the local cache (workaround for the TimeLog list-paging bug; the live API only returns the first 10). Update data/classification-cache.json when project types change.",
+        liveCount: live.length,
+        cacheCount: cache.length,
+        projectTypes,
+      };
+    },
   },
   {
     name: "list_project_categories",

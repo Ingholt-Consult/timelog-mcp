@@ -30,12 +30,25 @@ read from `TIMELOG_PAT`, or per request from an `Authorization: Bearer <pat>` he
 | List project types, categories, departments | Touch time registrations, expenses, invoicing |
 | List customers, contacts, users, employee types | Create employees / change working time |
 | Show the connected user (`whoami`) | Set StartDate / EndDate (not in the API update model) |
-| Update project fields (14 fields, one project per call) | Bulk-update many projects in one call |
+| Update project fields (11 fields, read-modify-write, one project per call) | Bulk-update many projects in one call |
 | Set project status (0–6) and time-tracking toggle | Resource booking / allocation |
 
 Mass changes are orchestrated in conversation: list → confirm the set → one
 update per project → per-project result. See `docs/superpowers/specs/` for the
 design and `docs/adr/` for the boundary decisions.
 
-> **Status labels:** `ProjectStatus` is a raw integer 0–6; the label per value is
-> not yet confirmed for this account. Verify in the UI before relying on a number.
+> **Updates are read-modify-write:** `PUT /project/{id}` is a full replace, not a
+> partial update (verified empirically — see ADR 0005). `update_project` reads the
+> project and merges your changes, so callers still pass only the fields to change.
+> The update model has 11 fields; `DepartmentID`/`AccountManagerID`/`PartnerID` are
+> not updatable, and `LanguageID` is not returned by GET (sent only if you pass it).
+
+> **Status labels:** `ProjectStatus` is a raw integer 0–6, confirmed via the
+> project's embedded action: 0=Quote, 1=Approved, 2=InProgress, 3=OnHold,
+> 4=Completed, 5=Archived, 6=Cancelled.
+
+> **Classification lists cap at 10:** TimeLog's list endpoints (e.g.
+> `GET /ProjectType`) return only the first 10 records with no working paging, so
+> `list_project_types` merges the live result with a manually-maintained cache in
+> `data/classification-cache.json`. Update that file when project types change.
+> A support ticket about the paging bug is pending.

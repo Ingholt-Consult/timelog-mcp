@@ -13,34 +13,77 @@ describe("project write tools", () => {
     expect(projectWriteTools.map((t) => t.name).sort()).toEqual(["update_project", "update_project_status"]);
   });
 
-  it("update_project PUTs only the provided fields, excluding projectID from the body", async () => {
+  // A representative GET /project/{id} response (wrapped, with `No` not `ProjectNo`).
+  const currentProject = {
+    Properties: {
+      ProjectID: 7,
+      Name: "Aggersvolg",
+      No: "A-25XX",
+      CustomerID: 1100,
+      ContactID: 403,
+      Description: "desc",
+      ProjectManagerID: 14,
+      ProjectTypeID: 262,
+      ProjectCategoryID: null,
+      BudgetWorkHours: 0,
+      BudgetWorkAmount: 100,
+      // fields outside the update model that must NOT be sent back
+      DepartmentID: 99,
+      StartDate: "2025-11-20T00:00:00",
+    },
+  };
+
+  it("update_project read-modify-writes: merges the change onto the full model (PUT is a full replace)", async () => {
+    const get = vi.fn(async () => currentProject);
     const put = vi.fn(async () => ({ ok: true }));
-    const client = { put } as unknown as TimeLogClient;
+    const client = { get, put } as unknown as TimeLogClient;
 
     await byName("update_project").handler(client, { projectID: 7, ProjectTypeID: 3 });
 
-    expect(put).toHaveBeenCalledWith("/project/7", { ProjectTypeID: 3 });
+    expect(get).toHaveBeenCalledWith("/project/7");
+    expect(put).toHaveBeenCalledWith("/project/7", {
+      Name: "Aggersvolg",
+      ProjectNo: "A-25XX", // mapped from `No`
+      CustomerID: 1100,
+      ContactID: 403,
+      Description: "desc",
+      ProjectManagerID: 14,
+      ProjectTypeID: 3, // the change
+      ProjectCategoryID: null,
+      BudgetWorkHours: 0,
+      BudgetWorkAmount: 100,
+    });
+    // DepartmentID / StartDate are not part of the update model.
+    const sent = put.mock.calls[0][1] as Record<string, unknown>;
+    expect(sent).not.toHaveProperty("DepartmentID");
+    expect(sent).not.toHaveProperty("StartDate");
   });
 
-  it("update_project sends multiple changed fields but nothing undefined", async () => {
+  it("update_project merges multiple changed fields and ignores undefined", async () => {
+    const get = vi.fn(async () => currentProject);
     const put = vi.fn(async () => ({}));
-    const client = { put } as unknown as TimeLogClient;
+    const client = { get, put } as unknown as TimeLogClient;
 
     await byName("update_project").handler(client, {
-      projectID: 9,
+      projectID: 7,
       Name: "Renamed",
       ProjectManagerID: 42,
       Description: undefined,
     });
 
-    expect(put).toHaveBeenCalledWith("/project/9", { Name: "Renamed", ProjectManagerID: 42 });
+    const sent = put.mock.calls[0][1] as Record<string, unknown>;
+    expect(sent.Name).toBe("Renamed");
+    expect(sent.ProjectManagerID).toBe(42);
+    expect(sent.Description).toBe("desc"); // undefined arg → current value preserved
   });
 
-  it("update_project rejects a call with no fields to change", async () => {
+  it("update_project rejects a call with no fields to change, without reading or writing", async () => {
+    const get = vi.fn(async () => currentProject);
     const put = vi.fn(async () => ({}));
-    const client = { put } as unknown as TimeLogClient;
+    const client = { get, put } as unknown as TimeLogClient;
 
     await expect(byName("update_project").handler(client, { projectID: 9 })).rejects.toThrow(/no fields/i);
+    expect(get).not.toHaveBeenCalled();
     expect(put).not.toHaveBeenCalled();
   });
 

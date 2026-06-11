@@ -1,5 +1,10 @@
 # Project updates are partial, verified empirically before batch
 
+> **SUPERSEDED by ADR 0005 (2026-06-11).** The empirical check failed: `PUT` is a
+> full replace, not a partial update. `update_project` now reads-modifies-writes.
+> The text below is retained for the historical record.
+
+
 `PUT /project/{id}` uses `ProjectApiUpdateModel`, whose 14 fields are all optional
 in the swagger spec. We treat updates as **partial** — send only the fields being
 changed — rather than read-modify-write (GetByID → merge → send the whole object).

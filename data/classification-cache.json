@@ -1,0 +1,23 @@
+{
+  "_note": "Local workaround cache for TimeLog classification lists. The TimeLog v1 API caps list endpoints (e.g. GET /ProjectType) at 10 records and has no working paging (see docs/runbooks/empirical-put-test.md and the support ticket), so the live API alone cannot return every project type. list_project_types merges this cache with the live result. UPDATE THIS FILE MANUALLY whenever project types change in TimeLog — and especially if the MCP server is ever used to add/edit project types — otherwise the merged list will be stale. projectCategories is complete (the API returns all 4); projectTypes is INCOMPLETE: TimeLog reports 27 types but only the ones observed so far are listed here.",
+  "_lastVerified": "2026-06-11",
+  "projectTypes": [
+    { "id": 246, "name": "Nybyg" },
+    { "id": 255, "name": "Bygherrerådgivning" },
+    { "id": 257, "name": "Notat" },
+    { "id": 258, "name": "Administration (internt)" },
+    { "id": 262, "name": "Ombyg/nybyg" },
+    { "id": 266, "name": "Forsikrings CODAN" },
+    { "id": 268, "name": "Nedrivning" },
+    { "id": 272, "name": "Brandrådgivning" },
+    { "id": 273, "name": "Facaderådgivning" },
+    { "id": 275, "name": "Byggeskadefonden" },
+    { "id": 277, "name": "Netværk og salg (internt)" }
+  ],
+  "projectCategories": [
+    { "id": 4, "name": "Lille sag (>100.000 kr.)" },
+    { "id": 5, "name": "Mellemstor sag (100.000 kr. – 1 mio. kr.)" },
+    { "id": 6, "name": "Stor sag (> 1 mio. kr.)" },
+    { "id": 7, "name": "Internt projekt" }
+  ]
+}

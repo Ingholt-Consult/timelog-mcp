@@ -26,4 +26,28 @@ and must be replaced with read-modify-write.
 
 ## Result log
 
-- (pending) — run against a real test project before trusting `update_project`.
+- **2026-06-11, project 1034 (TEST Aggersvolg Gods) — RESET/BLANKED. ADR 0002 is wrong.**
+  PUT `/project/1034` with only `{ ProjectTypeID: 257 }` returned **400 Invalid model
+  state**. The server's own echoed `Parameters` showed it bound the *full* model with
+  every omitted field defaulted to `null`/`0`:
+  `{"Name":null,"ProjectNo":null,"CustomerID":0,...,"ProjectManagerID":0,"ProjectTypeID":257,...}`.
+  Only because `Name`, `CustomerID`, and `ProjectManagerID` are required did it reject
+  rather than silently blank the rest. **PUT is a full replace, not a partial update.**
+  - Read-modify-write (GET → merge the one field → PUT all 10 update-model fields)
+    succeeded: `ProjectTypeID` 262 → 257, every other field preserved (verified by diff).
+  - **Action required:** supersede ADR 0002 and change `update_project` to RMW. See
+    repro scripts `test/manual/empirical-put-1034.mjs` (partial, fails) and
+    `test/manual/empirical-put-1034-rmw.mjs` (RMW, passes).
+
+### Field/shape facts learned from the same calls
+- GET `/project/{id}` wraps the record in `{ Properties: {...}, Links, Actions }`.
+- Field rename: GET exposes `No`; the update model wants `ProjectNo`.
+- The `update-project` action lists 11 writable fields: Name, ProjectNo, CustomerID,
+  ContactID, Description, ProjectManagerID, ProjectTypeID, ProjectCategoryID,
+  BudgetWorkHours, BudgetWorkAmount, LanguageID. **DepartmentID, AccountManagerID,
+  PartnerID are NOT in the update model** (the zod schema overstates them).
+- `LanguageID` is not returned by GET, so RMW cannot preserve it — known gap.
+- `ProjectStatus` enum is confirmed by the project's embedded action:
+  0=Quote, 1=Approved, 2=InProgress, 3=OnHold, 4=Completed, 5=Archived, 6=Cancelled.
+- List endpoints (`/ProjectType`, 27 records) hard-cap at 10 and ignore every paging
+  attempt (query, header, OData) — separate Phase 2 issue.
