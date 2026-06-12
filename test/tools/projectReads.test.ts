@@ -34,27 +34,22 @@ describe("project read tools", () => {
     expect(get).toHaveBeenCalledWith("/project/7");
   });
 
-  it("list_project_types merges the live /ProjectType result with the local cache", async () => {
+  it("list_project_types fetches the full list via $pagesize and returns the unwrapped rows sorted by name", async () => {
     const get = vi.fn(async () => ({
       Entities: [
+        { Properties: { ProjectTypeID: 249, Name: "Ombyg" } },
         { Properties: { ProjectTypeID: 246, Name: "Nybyg" } },
-        { Properties: { ProjectTypeID: 999, Name: "Live-only type" } },
       ],
     }));
     const client = { get } as unknown as TimeLogClient;
 
     const result = (await byName("list_project_types").handler(client, {})) as {
-      liveCount: number;
-      projectTypes: { ProjectTypeID: number; Name: string; source: string }[];
-    };
+      ProjectTypeID: number;
+      Name: string;
+    }[];
 
     expect(get).toHaveBeenCalledWith("/ProjectType", { $pagesize: 100 });
-    expect(result.liveCount).toBe(2);
-    // A cache-only type (Ombyg/nybyg = 262) is present even though the live API omitted it.
-    expect(result.projectTypes.find((t) => t.ProjectTypeID === 262)?.source).toBe("cache");
-    // A type in both live and cache is marked "both".
-    expect(result.projectTypes.find((t) => t.ProjectTypeID === 246)?.source).toBe("both");
-    // A live-only type is still included.
-    expect(result.projectTypes.find((t) => t.ProjectTypeID === 999)?.source).toBe("live");
+    // Unwrapped from Entities[].Properties and sorted by name (Nybyg before Ombyg).
+    expect(result.map((t) => t.ProjectTypeID)).toEqual([246, 249]);
   });
 });

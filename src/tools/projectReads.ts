@@ -1,6 +1,5 @@
 import { z } from "zod";
 import type { ToolDef } from "./types.js";
-import { loadClassificationCache } from "../classificationCache.js";
 
 // The live list endpoints wrap rows as { Entities: [{ Properties: {...} }] }.
 function unwrapEntities(resp: unknown): Record<string, unknown>[] {
@@ -38,29 +37,13 @@ export const projectReadTools: ToolDef[] = [
   {
     name: "list_project_types",
     description:
-      "List all Project Types (read-only classification) to resolve a type name to its ProjectTypeID. Fetches the full list via TimeLog's $pagesize query option (a bare list silently caps at 10 rows). A local cache in data/classification-cache.json is merged in as a fallback.",
+      "List all Project Types (read-only classification) to resolve a type name to its ProjectTypeID. Returns the full list, sorted by name.",
     inputSchema: {},
     handler: async (client) => {
-      // TimeLog list endpoints cap at 10 rows unless paged with $-options; ask for
-      // a large page so the live result is complete (see CONTEXT.md API conventions).
-      const live = unwrapEntities(await client.get("/ProjectType", { $pagesize: 100 }));
-      const cache = loadClassificationCache().projectTypes;
-      const byId = new Map<number, { ProjectTypeID: number; Name: string; source: string }>();
-      for (const c of cache) {
-        byId.set(c.id, { ProjectTypeID: c.id, Name: c.name, source: "cache" });
-      }
-      for (const l of live) {
-        const id = l.ProjectTypeID as number;
-        const name = String(l.Name ?? "").trim();
-        byId.set(id, { ProjectTypeID: id, Name: name, source: byId.has(id) ? "both" : "live" });
-      }
-      const projectTypes = [...byId.values()].sort((a, b) => a.Name.localeCompare(b.Name, "da"));
-      return {
-        note: "Merged live API result with the local cache (workaround for the TimeLog list-paging bug; the live API only returns the first 10). Update data/classification-cache.json when project types change.",
-        liveCount: live.length,
-        cacheCount: cache.length,
-        projectTypes,
-      };
+      // TimeLog list endpoints silently cap at 10 rows unless paged with $-options;
+      // $pagesize=100 returns the full list (see CONTEXT.md > API conventions).
+      const types = unwrapEntities(await client.get("/ProjectType", { $pagesize: 100 }));
+      return types.sort((a, b) => String(a.Name ?? "").localeCompare(String(b.Name ?? ""), "da"));
     },
   },
   {
@@ -68,12 +51,12 @@ export const projectReadTools: ToolDef[] = [
     description:
       "List all Project Categories (read-only classification, distinct from Project Type). Resolve a category name to its ProjectCategoryID.",
     inputSchema: {},
-    handler: (client) => client.get("/ProjectCategory"),
+    handler: (client) => client.get("/ProjectCategory", { $pagesize: 100 }),
   },
   {
     name: "list_departments",
     description: "List all Departments. Resolve a department name to its DepartmentID.",
     inputSchema: {},
-    handler: (client) => client.get("/department"),
+    handler: (client) => client.get("/department", { $pagesize: 100 }),
   },
 ];

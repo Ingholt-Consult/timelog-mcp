@@ -50,6 +50,5 @@ design and `docs/adr/` for the boundary decisions.
 > **Classification lists need `$pagesize`:** TimeLog's list endpoints (e.g.
 > `GET /ProjectType`) silently return only the first 10 rows unless paged with
 > TimeLog's `$`-query options (`$page`, `$pagesize`, `$expand`) — by design, not a
-> bug. `list_project_types` passes `$pagesize=100` to get the full list, and merges
-> a local cache (`data/classification-cache.json`) as a fallback. See
+> bug. The list tools pass `$pagesize=100` to return the full list. See
 > `CONTEXT.md` › API conventions.
