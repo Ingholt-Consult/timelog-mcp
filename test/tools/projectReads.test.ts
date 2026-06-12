@@ -48,7 +48,7 @@ describe("project read tools", () => {
       projectTypes: { ProjectTypeID: number; Name: string; source: string }[];
     };
 
-    expect(get).toHaveBeenCalledWith("/ProjectType");
+    expect(get).toHaveBeenCalledWith("/ProjectType", { $pagesize: 100 });
     expect(result.liveCount).toBe(2);
     // A cache-only type (Ombyg/nybyg = 262) is present even though the live API omitted it.
     expect(result.projectTypes.find((t) => t.ProjectTypeID === 262)?.source).toBe("cache");

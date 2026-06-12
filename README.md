@@ -47,8 +47,9 @@ design and `docs/adr/` for the boundary decisions.
 > project's embedded action: 0=Quote, 1=Approved, 2=InProgress, 3=OnHold,
 > 4=Completed, 5=Archived, 6=Cancelled.
 
-> **Classification lists cap at 10:** TimeLog's list endpoints (e.g.
-> `GET /ProjectType`) return only the first 10 records with no working paging, so
-> `list_project_types` merges the live result with a manually-maintained cache in
-> `data/classification-cache.json`. Update that file when project types change.
-> A support ticket about the paging bug is pending.
+> **Classification lists need `$pagesize`:** TimeLog's list endpoints (e.g.
+> `GET /ProjectType`) silently return only the first 10 rows unless paged with
+> TimeLog's `$`-query options (`$page`, `$pagesize`, `$expand`) — by design, not a
+> bug. `list_project_types` passes `$pagesize=100` to get the full list, and merges
+> a local cache (`data/classification-cache.json`) as a fallback. See
+> `CONTEXT.md` › API conventions.

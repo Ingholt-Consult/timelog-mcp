@@ -56,15 +56,42 @@ The User responsible for the customer relationship on a Project
 
 **Partner**:
 A third party associated with a Project (`PartnerID`), distinct from Project
-Manager and Account Manager. Settable via the project update model.
+Manager and Account Manager. NOT part of the project update model — read-only on
+the Project from this server's perspective (see ADR 0005).
 _Avoid_: subcontractor (that is a separate API concept), vendor.
 
 **Language**:
 The language set on a Project (`LanguageID`), used for project-facing output such
-as invoices. One of the 14 updatable project fields.
+as invoices. One of the update-model fields, but `GET /project/{id}` does not
+return it, so read-modify-write cannot preserve it (see ADR 0005).
 
 **Personal Access Token (PAT)**:
 The per-User credential used to authenticate to the REST API as a Bearer token.
 Employee-specific — it acts on behalf of the User it belongs to, so that User
 needs project-administration rights.
 _Avoid_: API key, secret.
+
+## API conventions
+
+Conventions that hold across TimeLog's REST API (v1), learned empirically — apply
+them to every endpoint, not just the ones already wired up.
+
+**Response wrapping.** A single resource comes back as
+`{ Properties: {...}, Links, Actions }` — the real fields are under `Properties`,
+and `Actions` lists the writable operations (with their field sets and enum
+labels). A list ("TAFList") comes back as
+`{ Properties: { TotalRecord, TotalPage, PageNumber }, Entities: [{ Properties: {...} }], Links }`
+— unwrap each row's `Properties`. Field names can differ between read and write
+models (e.g. a project's number is `No` when read but `ProjectNo` when written).
+
+**Paging — `$`-prefixed query options.** TAFList endpoints page with TimeLog's own
+options: **`$page`**, **`$pagesize`**, and **`$expand`** (collapse/expand child
+entities). Without them a list silently returns only the first **10** rows even
+though `TotalRecord` is higher — this is by design, not a bug. Example:
+`GET /ProjectType?$pagesize=100` returns all 27 types in one call;
+`?$page=2&$pagesize=10` returns the second page. Plain `pageNumber`/`pageSize`,
+`$skip`/`$top`, headers, etc. are ignored — only the `$page`/`$pagesize` form
+works. Always pass `$pagesize` when you need a full list.
+
+**PUT is a full replace**, not a partial update — read-modify-write the whole
+model (see ADR 0005).

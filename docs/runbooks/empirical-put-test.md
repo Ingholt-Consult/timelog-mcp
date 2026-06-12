@@ -49,5 +49,7 @@ and must be replaced with read-modify-write.
 - `LanguageID` is not returned by GET, so RMW cannot preserve it — known gap.
 - `ProjectStatus` enum is confirmed by the project's embedded action:
   0=Quote, 1=Approved, 2=InProgress, 3=OnHold, 4=Completed, 5=Archived, 6=Cancelled.
-- List endpoints (`/ProjectType`, 27 records) hard-cap at 10 and ignore every paging
-  attempt (query, header, OData) — separate Phase 2 issue.
+- List endpoints (`/ProjectType`, 27 records) return only 10 rows by default; page
+  them with TimeLog's `$`-query options (`$page`, `$pagesize`, `$expand`). E.g.
+  `GET /ProjectType?$pagesize=100` returns all 27. (Earlier this was mistaken for a
+  paging bug — it is a documented TAFList convention. See CONTEXT.md › API conventions.)

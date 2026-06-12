@@ -38,10 +38,12 @@ export const projectReadTools: ToolDef[] = [
   {
     name: "list_project_types",
     description:
-      "List all Project Types (read-only classification) to resolve a type name to its ProjectTypeID. Merges the live API result with a local cache, because the TimeLog API caps the list at 10 records and has no working paging (workaround — see data/classification-cache.json).",
+      "List all Project Types (read-only classification) to resolve a type name to its ProjectTypeID. Fetches the full list via TimeLog's $pagesize query option (a bare list silently caps at 10 rows). A local cache in data/classification-cache.json is merged in as a fallback.",
     inputSchema: {},
     handler: async (client) => {
-      const live = unwrapEntities(await client.get("/ProjectType"));
+      // TimeLog list endpoints cap at 10 rows unless paged with $-options; ask for
+      // a large page so the live result is complete (see CONTEXT.md API conventions).
+      const live = unwrapEntities(await client.get("/ProjectType", { $pagesize: 100 }));
       const cache = loadClassificationCache().projectTypes;
       const byId = new Map<number, { ProjectTypeID: number; Name: string; source: string }>();
       for (const c of cache) {
