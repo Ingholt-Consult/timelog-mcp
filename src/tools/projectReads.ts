@@ -1,12 +1,6 @@
 import { z } from "zod";
 import type { ToolDef } from "./types.js";
-
-// The live list endpoints wrap rows as { Entities: [{ Properties: {...} }] }.
-function unwrapEntities(resp: unknown): Record<string, unknown>[] {
-  const entities = (resp as { Entities?: { Properties?: Record<string, unknown> }[] })?.Entities;
-  if (!Array.isArray(entities)) return [];
-  return entities.map((e) => e.Properties ?? {}).filter(Boolean) as Record<string, unknown>[];
-}
+import { unwrapList } from "./unwrap.js";
 
 export const projectReadTools: ToolDef[] = [
   {
@@ -42,7 +36,7 @@ export const projectReadTools: ToolDef[] = [
     handler: async (client) => {
       // TimeLog list endpoints silently cap at 10 rows unless paged with $-options;
       // $pagesize=100 returns the full list (see CONTEXT.md > API conventions).
-      const types = unwrapEntities(await client.get("/ProjectType", { $pagesize: 100 }));
+      const types = unwrapList(await client.get("/ProjectType", { $pagesize: 100 }));
       return types.sort((a, b) => String(a.Name ?? "").localeCompare(String(b.Name ?? ""), "da"));
     },
   },
