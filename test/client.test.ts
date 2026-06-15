@@ -49,4 +49,23 @@ describe("TimeLogClient", () => {
 
     await expect(client.get("/project/999")).rejects.toThrow(/404/);
   });
+
+  it("POSTs a JSON body and returns parsed JSON", async () => {
+    const f = fakeFetch(200, { ProjectID: 99 });
+    const client = new TimeLogClient({ baseUrl: "https://x/api/v1", pat: "tok", fetchImpl: f });
+
+    const data = await client.post("/project/create-from-template", { Name: "New" });
+
+    const [, init] = f.mock.calls[0];
+    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).body).toBe(JSON.stringify({ Name: "New" }));
+    expect(data).toEqual({ ProjectID: 99 });
+  });
+
+  it("POST maps an empty 200 body to null", async () => {
+    const f = vi.fn(async () => new Response("", { status: 200 }));
+    const client = new TimeLogClient({ baseUrl: "https://x/api/v1", pat: "tok", fetchImpl: f });
+
+    expect(await client.post("/task", { TaskName: "x" })).toBeNull();
+  });
 });

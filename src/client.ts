@@ -55,4 +55,8 @@ export class TimeLogClient {
   put<T = unknown>(path: string, body: unknown): Promise<T> {
     return this.request<T>("PUT", path, undefined, body);
   }
+
+  post<T = unknown>(path: string, body: unknown): Promise<T> {
+    return this.request<T>("POST", path, undefined, body);
+  }
 }
