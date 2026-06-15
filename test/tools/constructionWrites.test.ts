@@ -146,4 +146,43 @@ describe("construction write tools", () => {
 
     expect(post).toHaveBeenCalledWith("/payment/validate-new-payment", expect.any(Object));
   });
+
+  it("create_project_from_template preview enriches template and customer names", async () => {
+    const post = vi.fn(async () => ({ ok: true }));
+    const get = vi.fn(async (path: string) => {
+      if (path === "/project-template/get-all")
+        return { Entities: [{ Properties: { ProjectTemplateID: 9, Name: "Fastpris – Småsag" } }] };
+      if (path === "/customer") return { Entities: [{ Properties: { CustomerID: 1100, Name: "Acme" } }] };
+      return { Entities: [] };
+    });
+    const client = { post, get } as unknown as TimeLogClient;
+
+    const result = (await byName("create_project_from_template").handler(client, {
+      mode: "preview",
+      ProjectTemplateID: 9,
+      CustomerID: 1100,
+      Name: "API-TEST",
+    })) as { summary: { template: { name: string }; customer: { name: string } } };
+
+    expect(result.summary.template.name).toBe("Fastpris – Småsag");
+    expect(result.summary.customer.name).toBe("Acme");
+  });
+
+  it("create_time_material_contract preview enriches the project name via getOneName", async () => {
+    const post = vi.fn(async () => ({ ok: true }));
+    const get = vi.fn(async (path: string) => {
+      if (path === "/project/7") return { Properties: { ProjectID: 7, Name: "Aggersvolg" } };
+      return {};
+    });
+    const client = { post, get } as unknown as TimeLogClient;
+
+    const result = (await byName("create_time_material_contract").handler(client, {
+      mode: "preview",
+      ProjectID: 7,
+      ContractName: "T&M",
+    })) as { summary: { contractModel: string; project: { name: string } } };
+
+    expect(result.summary.contractModel).toBe("TimeMaterialBasic");
+    expect(result.summary.project.name).toBe("Aggersvolg");
+  });
 });
