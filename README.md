@@ -1,4 +1,4 @@
-# TimeLog MCP (Phase 1)
+# TimeLog MCP (Phases 1–2)
 
 A localhost MCP server for administering TimeLog projects via the REST API (v1).
 
@@ -23,19 +23,36 @@ read from `TIMELOG_PAT`, or per request from an `Authorization: Bearer <pat>` he
 
 ## Capabilities
 
-| Can | Cannot (Phase 1) |
+| Can | Cannot |
 |---|---|
-| List projects (filter by customer / active) | Create or delete projects |
-| Read one project in full | Create/update tasks or contracts |
-| List project types, categories, departments | Touch time registrations, expenses, invoicing |
-| List customers, contacts, users, employee types | Create employees / change working time |
-| Show the connected user (`whoami`) | Set StartDate / EndDate (not in the API update model) |
+| List projects (filter by customer / active); read one in full | Delete anything — the API has no DELETE for projects, tasks, contracts, or payments |
+| List project types, categories, departments, customers, contacts, users, employee types | Create or edit **project templates** (no template-write endpoint — see below) |
+| Show the connected user (`whoami`) | Set StartDate / EndDate on the project update model |
 | Update project fields (11 fields, read-modify-write, one project per call) | Bulk-update many projects in one call |
-| Set project status (0–6) and time-tracking toggle | Resource booking / allocation |
+| Set project status (0–6) and time-tracking toggle | Touch time registrations, expenses, or invoicing |
+| **Create a project from a template** (`create_project_from_template`) | Create employees / change working time |
+| **Add tasks and sub-tasks** (`create_task`) | Book resources / allocate (planned for Phase 3) |
+| **Add T&M and fixed-price contracts** (`create_time_material_contract`, `create_fixed_price_contract`) | |
+| **Add payment-plan lines** (`create_payment`) | |
+| Read the supporting data: templates, tasks, task types, contracts, payments, hourly rates | |
+
+Every write tool runs in **preview** mode by default — it validates against
+TimeLog's paired `validate-*` endpoint and shows exactly what would be created —
+and only writes when called again with `mode: "execute"` after you confirm.
 
 Mass changes are orchestrated in conversation: list → confirm the set → one
-update per project → per-project result. See `docs/superpowers/specs/` for the
+write per resource → per-resource result. See `docs/superpowers/specs/` for the
 design and `docs/adr/` for the boundary decisions.
+
+### Building a new project template
+
+The REST API cannot create or edit templates. The supported path is:
+
+1. Use `create_project_from_template` (or an existing project) plus `create_task`
+   and the contract tools to construct a project shaped exactly like the template
+   you want.
+2. In TimeLog's web UI, open that project and choose **Save as template**.
+3. The new template then appears in `list_project_templates` for future use.
 
 > **Updates are read-modify-write:** `PUT /project/{id}` is a full replace, not a
 > partial update (verified empirically — see ADR 0005). `update_project` reads the
