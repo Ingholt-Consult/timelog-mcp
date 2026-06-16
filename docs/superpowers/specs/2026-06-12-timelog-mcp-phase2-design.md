@@ -92,10 +92,12 @@ unwrap (CONTEXT.md › API conventions).
 Every write tool takes `mode: "preview" | "execute"`, **default `"preview"`**.
 
 - **Preview** posts the full payload to the paired `validate-*` endpoint and
-  returns (a) the validation outcome (errors or OK) and (b) a structured summary
-  of exactly what would be created, with looked-up display names (template name,
-  customer name, …) instead of bare IDs where the existing reads make that cheap.
-  Nothing is written.
+  returns (a) the validation outcome (errors or OK) and (b) the exact payload that
+  would be sent. Nothing is written.
+  > **Superseded by ADR 0006.** This originally returned a server-enriched summary
+  > with looked-up display names; that enrichment was deleted on review. The
+  > preview returns the verbatim payload (IDs and all); turning IDs into names for
+  > the confirmation is the caller's job. Not deferred — see ADR 0006.
 - **Execute** posts to the real create endpoint and returns the created resource
   (including its new ID).
 - Enforcement is **soft** (owner's choice): tool descriptions instruct Claude to

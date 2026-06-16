@@ -7,7 +7,7 @@ export const modeField = {
     .enum(["preview", "execute"])
     .default("preview")
     .describe(
-      "preview (default): POSTs to the validate-* endpoint, writes NOTHING, and returns the validation outcome plus a summary of what would be created. execute: performs the real create. Always preview first, show the user, and only execute after an explicit yes.",
+      "preview (default): POSTs to the validate-* endpoint, writes NOTHING, and returns the validation outcome plus the exact payload that would be sent. execute: performs the real create. Always preview first, show the user, and only execute after an explicit yes.",
     ),
 } as const;
 

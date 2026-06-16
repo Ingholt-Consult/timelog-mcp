@@ -2,16 +2,11 @@ import type { TimeLogClient } from "../client.js";
 
 export type WriteMode = "preview" | "execute";
 
-// A summarizer enriches the preview with display names; it is best-effort and its
-// failure must never fail the preview.
-export type Summarizer = (client: TimeLogClient, body: Record<string, unknown>) => Promise<Record<string, unknown>>;
-
 export interface RunWriteOptions {
   mode: WriteMode;
   validatePath: string;
   executePath: string;
   body: Record<string, unknown>;
-  summarize?: Summarizer;
 }
 
 // Build the POST body from tool args: drop the `mode` switch and any undefined fields.
@@ -35,13 +30,5 @@ export async function runWrite(client: TimeLogClient, opts: RunWriteOptions): Pr
   } catch (err) {
     validation = { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
-  let summary: Record<string, unknown> | undefined;
-  if (opts.summarize) {
-    try {
-      summary = await opts.summarize(client, opts.body);
-    } catch {
-      summary = undefined; // enrichment is best-effort
-    }
-  }
-  return { mode: "preview", validation, summary, payload: opts.body };
+  return { mode: "preview", validation, payload: opts.body };
 }

@@ -43,17 +43,13 @@ describe("runWrite", () => {
     expect(result.validation.error).toMatch(/400/);
   });
 
-  it("preview runs the summarizer but a summarizer failure does not fail the preview", async () => {
+  it("preview returns the exact payload that would be sent", async () => {
     const post = vi.fn(async () => ({ ok: true }));
-    const summarize = vi.fn(async () => {
-      throw new Error("enrichment lookup failed");
-    });
     const client = { post } as unknown as TimeLogClient;
 
-    const result = (await runWrite(client, { ...opts("preview"), summarize })) as { summary?: unknown };
+    const result = (await runWrite(client, opts("preview"))) as { payload: Record<string, unknown> };
 
-    expect(summarize).toHaveBeenCalled();
-    expect(result.summary).toBeUndefined();
+    expect(result.payload).toEqual({ Name: "API-TEST", ProjectTemplateID: 9 });
   });
 
   it("execute POSTs the real create endpoint and returns its result", async () => {

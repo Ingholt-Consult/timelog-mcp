@@ -23,8 +23,7 @@ describe("construction write tools", () => {
 
   it("create_project_from_template preview hits validate, never create", async () => {
     const post = vi.fn(async () => ({ ok: true }));
-    const get = vi.fn(async () => ({ Entities: [] })); // enrichment lookups
-    const client = { post, get } as unknown as TimeLogClient;
+    const client = { post } as unknown as TimeLogClient;
 
     await byName("create_project_from_template").handler(client, {
       mode: "preview",
@@ -80,8 +79,7 @@ describe("construction write tools", () => {
 
   it("create_task preview always validates against /task/validate-new-task (both routes)", async () => {
     const post = vi.fn(async () => ({ ok: true }));
-    const get = vi.fn(async () => ({ Entities: [] }));
-    const client = { post, get } as unknown as TimeLogClient;
+    const client = { post } as unknown as TimeLogClient;
 
     await byName("create_task").handler(client, { mode: "preview", ProjectID: 7, ParentTaskID: 42, TaskName: "Sub" });
 
@@ -136,8 +134,7 @@ describe("construction write tools", () => {
 
   it("defaults to preview when mode is omitted", async () => {
     const post = vi.fn(async () => ({ ok: true }));
-    const get = vi.fn(async () => ({ Entities: [] }));
-    const client = { post, get } as unknown as TimeLogClient;
+    const client = { post } as unknown as TimeLogClient;
 
     // The tool handler receives args already parsed by the SDK against inputSchema,
     // so mode is defaulted upstream; here we assert the handler treats a missing
@@ -147,14 +144,9 @@ describe("construction write tools", () => {
     expect(post).toHaveBeenCalledWith("/payment/validate-new-payment", expect.any(Object));
   });
 
-  it("create_project_from_template preview enriches template and customer names", async () => {
+  it("preview returns the payload that would be sent, never calling a read endpoint", async () => {
     const post = vi.fn(async () => ({ ok: true }));
-    const get = vi.fn(async (path: string) => {
-      if (path === "/project-template/get-all")
-        return { Entities: [{ Properties: { ProjectTemplateID: 9, Name: "Fastpris – Småsag" } }] };
-      if (path === "/customer") return { Entities: [{ Properties: { CustomerID: 1100, Name: "Acme" } }] };
-      return { Entities: [] };
-    });
+    const get = vi.fn();
     const client = { post, get } as unknown as TimeLogClient;
 
     const result = (await byName("create_project_from_template").handler(client, {
@@ -162,27 +154,10 @@ describe("construction write tools", () => {
       ProjectTemplateID: 9,
       CustomerID: 1100,
       Name: "API-TEST",
-    })) as { summary: { template: { name: string }; customer: { name: string } } };
+    })) as { mode: string; payload: Record<string, unknown> };
 
-    expect(result.summary.template.name).toBe("Fastpris – Småsag");
-    expect(result.summary.customer.name).toBe("Acme");
-  });
-
-  it("create_time_material_contract preview enriches the project name via getOneName", async () => {
-    const post = vi.fn(async () => ({ ok: true }));
-    const get = vi.fn(async (path: string) => {
-      if (path === "/project/7") return { Properties: { ProjectID: 7, Name: "Aggersvolg" } };
-      return {};
-    });
-    const client = { post, get } as unknown as TimeLogClient;
-
-    const result = (await byName("create_time_material_contract").handler(client, {
-      mode: "preview",
-      ProjectID: 7,
-      ContractName: "T&M",
-    })) as { summary: { contractModel: string; project: { name: string } } };
-
-    expect(result.summary.contractModel).toBe("TimeMaterialBasic");
-    expect(result.summary.project.name).toBe("Aggersvolg");
+    expect(result.mode).toBe("preview");
+    expect(result.payload).toEqual({ ProjectTemplateID: 9, CustomerID: 1100, Name: "API-TEST" });
+    expect(get).not.toHaveBeenCalled();
   });
 });
