@@ -87,12 +87,26 @@ the contracts/payments underneath.
   descriptions.
 - **Step 2 (real execute, create-from-template):** minimal body
   `{ProjectTemplateID:7, Name}` → **400 with the SAME field errors as the dry
-  validate** (CustomerID>0, ProjectManagerID, ProjectTypeID>0, CurrencyID>0,
-  ProjectStartDate, ProjectEndDate). Conclusions: validate is NOT stricter than
-  execute; the template does NOT auto-supply these fields; **nothing was created**
-  (so no cleanup). Script: `empirical-create-execute-step2.mjs`.
-- **Gate outcome:** these 8 fields on create-from-template are genuinely required
-  → safe to drop `.optional()` on them in `constructionSchemas.ts`.
+  validate**. Conclusion: validate is NOT stricter than execute; template does NOT
+  auto-supply these; nothing created. Script: `empirical-create-execute-step2.mjs`.
+- **Step 2 (full execute, end-to-end):** a complete body finally validated 200 and
+  **created ProjectID 1179** with the template's **7 tasks + 2 contracts** (2454
+  FP, 2453 T&M). Template population works. Script:
+  `empirical-create-execute-step2-full.mjs`. Project 1179 to be archived
+  (`archive-test-project.mjs`).
+  - **Layered business rules** (surfaced one-at-a-time AFTER model validation, not
+    in the "must not be empty" list):
+    1. `CurrencyID` must be a currency that HAS a price list — DKK=**35** works;
+       AED=39 failed with "Price list with id 39 not found" (30097).
+    2. `ProjectCategoryID` must be **> 0** (60013) — see list_project_categories.
+    3. `ProjectNo` must be set — create-from-template does **NOT** auto-generate it
+       (30171), unlike the UI.
+  - Field shapes confirmed from the create response's HATEOAS Actions; the
+    currency entity uses `CurrencyID` / `CurrencyABB` / `DescriptiveName`.
+- **Gate outcome:** create-from-template genuinely requires **10** fields
+  (ProjectTemplateID, Name, ProjectNo, CustomerID, ProjectManagerID, ProjectTypeID,
+  ProjectCategoryID, CurrencyID, ProjectStartDate, ProjectEndDate). All now
+  non-optional in `constructionSchemas.ts`. **Gate fully complete.**
 
 > **Caveat on the strategy above:** Step 2 says use an "internal, customer-less"
 > project, but Step 1 found create-from-template's validate **requires

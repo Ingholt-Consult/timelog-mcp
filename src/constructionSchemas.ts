@@ -11,24 +11,27 @@ export const modeField = {
     ),
 } as const;
 
-// POST /project/create-from-template — ProjectApiCreateModel (18 fields). The 8
-// fields the empirical gate proved REQUIRED (2026-06-16) are non-optional; the
-// rest stay optional. validate == execute for this endpoint (a minimal execute
-// returned the same errors), and the template does NOT auto-supply these. Dates
-// are ISO 8601 strings. See docs/runbooks/empirical-create-tests.md.
+// POST /project/create-from-template — ProjectApiCreateModel (18 fields). The 10
+// fields the empirical gate proved REQUIRED (2026-06-16, verified by a real
+// create → ProjectID 1179) are non-optional; the rest stay optional. validate ==
+// execute, and the template does NOT auto-supply these. Beyond plain model
+// validation, business rules also apply: CurrencyID must be a currency that HAS a
+// price list (use DKK=35; AED=39 failed), ProjectCategoryID must be > 0, and
+// ProjectNo is NOT auto-generated (unlike the UI). Dates are ISO 8601 strings.
+// See docs/runbooks/empirical-create-tests.md.
 export const createProjectFromTemplateShape = {
   ...modeField,
   ProjectTemplateID: z.number().int().describe("Template to build from (see list_project_templates). Required."),
   Name: z.string().describe("Project name. Required."),
-  ProjectNo: z.string().optional().describe("Project number (usually auto-generated; omit unless overriding)."),
+  ProjectNo: z.string().describe("Project number. Required — create-from-template does NOT auto-generate it (unlike the UI)."),
   CustomerID: z.number().int().describe("Owning CustomerID. Required and must be > 0 — the template does NOT supply it (no internal/customer-less project from a template)."),
   Description: z.string().optional().describe("Project description."),
   ProjectManagerID: z.number().int().describe("UserID of the Project Manager. Required."),
   ProjectStartDate: z.string().describe("Project start date, ISO 8601 (e.g. 2026-06-15T00:00:00). Required."),
   ProjectEndDate: z.string().describe("Project end date, ISO 8601. Required."),
   ProjectTypeID: z.number().int().describe("ProjectTypeID (classification). Required and must be > 0."),
-  ProjectCategoryID: z.number().int().optional().describe("ProjectCategoryID (classification)."),
-  CurrencyID: z.number().int().describe("CurrencyID. Required and must be > 0."),
+  ProjectCategoryID: z.number().int().describe("ProjectCategoryID (classification). Required and must be > 0 (business rule 60013; see list_project_categories)."),
+  CurrencyID: z.number().int().describe("CurrencyID. Required and must be > 0, and must be a currency that has a price list (DKK=35 in this account; a currency without a price list fails)."),
   LegalEntityID: z.number().int().optional().describe("LegalEntityID."),
   DepartmentID: z.number().int().optional().describe("DepartmentID."),
   AccountManagerID: z.number().int().optional().describe("UserID of the Account Manager."),

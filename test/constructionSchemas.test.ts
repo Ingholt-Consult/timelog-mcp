@@ -28,19 +28,23 @@ describe("construction schemas", () => {
     const full = {
       ProjectTemplateID: 9,
       Name: "API-TEST",
+      ProjectNo: "API-TEST-001",
       CustomerID: 1100,
       ProjectManagerID: 5,
       ProjectTypeID: 262,
-      CurrencyID: 1,
+      ProjectCategoryID: 7,
+      CurrencyID: 35,
       ProjectStartDate: "2026-06-16T00:00:00",
       ProjectEndDate: "2026-12-31T00:00:00",
     };
     const ok = schema.parse(full);
     expect(ok.mode).toBe("preview");
     expect(ok.ProjectTemplateID).toBe(9);
-    // dropping any one required field fails
-    const { CustomerID, ...missingCustomer } = full;
-    expect(schema.safeParse(missingCustomer).success).toBe(false);
+    // dropping any one required field fails (ProjectNo and ProjectCategoryID included)
+    const { ProjectNo, ...missingNo } = full;
+    expect(schema.safeParse(missingNo).success).toBe(false);
+    const { ProjectCategoryID, ...missingCategory } = full;
+    expect(schema.safeParse(missingCategory).success).toBe(false);
   });
 
   it("create_task requires ProjectID/TaskName/budget/HourlyRateID/dates, ParentTaskID optional", () => {
