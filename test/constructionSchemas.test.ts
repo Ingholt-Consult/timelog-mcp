@@ -19,32 +19,74 @@ describe("construction schemas", () => {
     expect(z.object(modeField).safeParse({ mode: "delete" }).success).toBe(false);
   });
 
-  it("create_project_from_template carries the template field and mode, all optional", () => {
+  // The empirical gate (2026-06-16) proved which fields are required at execute;
+  // they are no longer .optional(). An empty body must now fail, and a full body
+  // parses with mode defaulting to preview.
+  it("create_project_from_template enforces the gate-proven required fields", () => {
     const schema = z.object(createProjectFromTemplateShape);
-    expect(schema.parse({}).mode).toBe("preview");
-    const ok = schema.parse({ ProjectTemplateID: 9, Name: "API-TEST", CustomerID: 1100, mode: "execute" });
+    expect(schema.safeParse({}).success).toBe(false);
+    const full = {
+      ProjectTemplateID: 9,
+      Name: "API-TEST",
+      CustomerID: 1100,
+      ProjectManagerID: 5,
+      ProjectTypeID: 262,
+      CurrencyID: 1,
+      ProjectStartDate: "2026-06-16T00:00:00",
+      ProjectEndDate: "2026-12-31T00:00:00",
+    };
+    const ok = schema.parse(full);
+    expect(ok.mode).toBe("preview");
     expect(ok.ProjectTemplateID).toBe(9);
-    expect(ok.mode).toBe("execute");
+    // dropping any one required field fails
+    const { CustomerID, ...missingCustomer } = full;
+    expect(schema.safeParse(missingCustomer).success).toBe(false);
   });
 
-  it("create_task exposes ParentTaskID (sub-task routing) and TaskTypeID", () => {
-    const keys = Object.keys(createTaskShape);
-    expect(keys).toContain("ParentTaskID");
-    expect(keys).toContain("TaskTypeID");
-    expect(keys).toContain("ProjectSubContractID");
-    expect(keys).toContain("mode");
+  it("create_task requires ProjectID/TaskName/budget/HourlyRateID/dates, ParentTaskID optional", () => {
+    const schema = z.object(createTaskShape);
+    expect(schema.safeParse({}).success).toBe(false);
+    const full = {
+      ProjectID: 1034,
+      TaskName: "API-TEST opgave",
+      BudgetHours: 10,
+      BudgetAmount: 10000,
+      HourlyRateID: 1,
+      StartDate: "2026-06-16T00:00:00",
+      EndDate: "2026-06-30T00:00:00",
+    };
+    expect(schema.safeParse(full).success).toBe(true);
+    // ParentTaskID is optional (its presence routes to the sub-task endpoint)
+    expect(Object.keys(createTaskShape)).toContain("ParentTaskID");
+    expect(Object.keys(createTaskShape)).toContain("TaskTypeID");
   });
 
-  it("contract shapes differ where the models differ", () => {
+  it("contract shapes require ProjectID/ContractName/ContractStatus and differ where the models differ", () => {
+    const tm = z.object(timeMaterialContractShape);
+    const fp = z.object(fixedPriceContractShape);
+    expect(tm.safeParse({}).success).toBe(false);
+    const base = { ProjectID: 1034, ContractName: "API-TEST", ContractStatus: 2 };
+    expect(tm.safeParse(base).success).toBe(true);
+    expect(fp.safeParse(base).success).toBe(true);
+    // ContractStatus 0 is invalid (enum is 1..4)
+    expect(tm.safeParse({ ...base, ContractStatus: 0 }).success).toBe(false);
     expect(Object.keys(timeMaterialContractShape)).toContain("HasBudgetOverrunNotification");
     expect(Object.keys(fixedPriceContractShape)).toContain("PaymentPlanAmount");
     expect(Object.keys(fixedPriceContractShape)).toContain("TargetHourlyRate");
     expect(Object.keys(timeMaterialContractShape)).not.toContain("PaymentPlanAmount");
   });
 
-  it("create_payment carries Amount and the contract link", () => {
-    const keys = Object.keys(createPaymentShape);
-    expect(keys).toContain("Amount");
-    expect(keys).toContain("ProjectSubContractID");
+  it("create_payment requires ProjectID/ProjectSubContractID/Name/InvoiceDate", () => {
+    const schema = z.object(createPaymentShape);
+    expect(schema.safeParse({}).success).toBe(false);
+    const full = {
+      ProjectID: 1034,
+      ProjectSubContractID: 2244,
+      Name: "API-TEST rate",
+      InvoiceDate: "2026-06-30T00:00:00",
+    };
+    expect(schema.safeParse(full).success).toBe(true);
+    // Amount stays optional (the gate showed Amount 0 was accepted)
+    expect(Object.keys(createPaymentShape)).toContain("Amount");
   });
 });

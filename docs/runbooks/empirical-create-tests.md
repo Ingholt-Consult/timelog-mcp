@@ -85,9 +85,14 @@ the contracts/payments underneath.
   `PaymentRecognitionModel`, `UnitType`, `ContractTypeID`) resolved — from the live
   HATEOAS `Actions` metadata, not the swagger. Folded into `constructionSchemas.ts`
   descriptions.
-- **Only thing left = Step 2:** whether validate is stricter than execute for
-  create-from-template (the `CustomerID`>0 demand). One real execute settles it
-  before any schema field is made required.
+- **Step 2 (real execute, create-from-template):** minimal body
+  `{ProjectTemplateID:7, Name}` → **400 with the SAME field errors as the dry
+  validate** (CustomerID>0, ProjectManagerID, ProjectTypeID>0, CurrencyID>0,
+  ProjectStartDate, ProjectEndDate). Conclusions: validate is NOT stricter than
+  execute; the template does NOT auto-supply these fields; **nothing was created**
+  (so no cleanup). Script: `empirical-create-execute-step2.mjs`.
+- **Gate outcome:** these 8 fields on create-from-template are genuinely required
+  → safe to drop `.optional()` on them in `constructionSchemas.ts`.
 
 > **Caveat on the strategy above:** Step 2 says use an "internal, customer-less"
 > project, but Step 1 found create-from-template's validate **requires
