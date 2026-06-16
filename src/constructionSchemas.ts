@@ -65,7 +65,7 @@ export const createTaskShape = {
     .min(0)
     .max(2)
     .optional()
-    .describe("PaymentRecognitionModel enum (0|1|2) — meaning unconfirmed; verify via the empirical gate."),
+    .describe("PaymentRecognitionModel enum: 0=Undefined, 1=OverallPaymentPlan, 2=FixedPricePayment (confirmed via the gate, 2026-06-16)."),
   PaymentAmount: z.number().optional().describe("Payment amount (TDR task)."),
   TaskHourlyRate: z.number().optional().describe("Hourly rate of a TDR task."),
   PaymentProductNo: z.string().optional().describe("Payment product no. (TDR task)."),
@@ -84,13 +84,13 @@ const contractCommon = {
     .min(1)
     .max(4)
     .optional()
-    .describe("ContractStatus enum (1|2|3|4) — labels unconfirmed; verify via the gate."),
+    .describe("ContractStatus enum: 1=Quotation, 2=Active, 3=Completed, 4=Cancelled (confirmed via the gate, 2026-06-16; 0 is invalid)."),
   ContractOwnerUserID: z.number().int().optional().describe("UserID of the contract owner."),
   ContractTypeID: z
     .number()
     .int()
     .optional()
-    .describe("ContractTypeID — no list endpoint exists; meaning resolved by the empirical gate."),
+    .describe("ContractTypeID — optional; 0 means none (real contracts carry ContractTypeID 0 / empty ContractTypeName). Confirmed via the gate, 2026-06-16."),
   BudgetWorkAmount: z.number().optional().describe("Budget work amount."),
   BudgetWorkHour: z.number().optional().describe("Budget work hours."),
   BudgetExpensesAmount: z.number().optional().describe("Budget expenses amount."),
@@ -137,5 +137,5 @@ export const createPaymentShape = {
     .number()
     .int()
     .optional()
-    .describe("UnitType enum (0,1,2,3,4,6,7,8,9) — labels unconfirmed; verify via the gate."),
+    .describe("UnitType enum (InvoiceUnitTypes): 0=Undefined, 1=Hours, 2=Minutes, 3=Days, 4=Km, 5=Pieces, 6=Liters, 7=Meters, 8=Kilograms (confirmed via the gate, 2026-06-16)."),
 } as const;
