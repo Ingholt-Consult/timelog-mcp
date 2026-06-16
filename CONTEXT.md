@@ -74,7 +74,9 @@ _Avoid_: API key, secret.
 ## API conventions
 
 Conventions that hold across TimeLog's REST API (v1), learned empirically — apply
-them to every endpoint, not just the ones already wired up.
+them to every endpoint, not just the ones already wired up. Per-endpoint
+reference (request models, enums, response shapes, docs-vs-swagger conflicts) lives
+in [`docs/timelog-api/`](docs/timelog-api/README.md).
 
 **Response wrapping.** A single resource comes back as
 `{ Properties: {...}, Links, Actions }` — the real fields are under `Properties`,
