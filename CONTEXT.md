@@ -71,6 +71,54 @@ Employee-specific — it acts on behalf of the User it belongs to, so that User
 needs project-administration rights.
 _Avoid_: API key, secret.
 
+**Project Template**:
+A reusable blueprint (`ProjectTemplateID`) carrying a Project's Task/Sub-task
+structure and the per-Task Contract assignment. A Project is created from one
+(`POST /project/create-from-template`). **Read-only in the API**
+(`GET /project-template/get-all`): the API cannot create, edit, or delete
+templates — building and saving a template is a UI-only action (see API
+conventions › No template write).
+_Avoid_: blueprint, scaffold.
+
+**Task**:
+A unit of work within a Project (`TaskID`) forming the project plan. Has a Task
+Type, a status, an optional budget with an Hourly Rate, and may link to a
+Contract.
+_Avoid_: activity, item.
+
+**Sub-task**:
+A Task nested under a parent Task (referenced by `parentTaskID`). Shares the same
+model as a Task; distinguished only by having a parent.
+_Avoid_: child task (use Sub-task).
+
+**Task Type**:
+A classification of a Task — the firm's ydelsesfaser (e.g. 1.1 Idéoplæg →
+4.8 Certificering KK3). Read-only list (`GET /TaskType`).
+_Avoid_: phase, category.
+
+**Contract**:
+The framework governing how a Project is invoiced and how revenue is recognised
+(`ContractID`). A Project can hold several. Listed per Project
+(`GET /contract?projectID=`).
+_Avoid_: agreement.
+
+**Contract Model**:
+The kind of a Contract. Two are in the account's setup: TimeMaterialBasic
+(`ContractModelID` 1) and FixedPriceBasic (2); the three other API models
+(prepaid services, task-driven revenue, T&M account end-balancing) are not used.
+_Avoid_: contract type — `ContractTypeID` is a separate field on the create
+model whose meaning is not yet resolved.
+
+**Payment**:
+A line in a Contract's payment plan (`PaymentID`) — e.g. a fixed-price milestone
+amount. Listed per Contract (`GET /payment?contractID=`).
+_Avoid_: invoice, installment.
+
+**Hourly Rate**:
+A billing rate (`HourlyRateID`) that a Task references for its budget; resolved
+per Contract via `GET /contract-hourly-rate?contractID=`.
+_Avoid_: price, tariff.
+
 ## API conventions
 
 Conventions that hold across TimeLog's REST API (v1), learned empirically — apply
@@ -97,3 +145,15 @@ works. Always pass `$pagesize` when you need a full list.
 
 **PUT is a full replace**, not a partial update — read-modify-write the whole
 model (see ADR 0005).
+
+**No template write.** The REST API (v1) exposes only `GET /project-template/get-all`
+for Project Templates — there is no POST/PUT/DELETE and no "save-as-template"
+endpoint anywhere in the spec, even though the product UI supports building and
+saving templates. Creating or editing a template is therefore a UI-only action.
+The supported substitute is to construct a source Project with the Phase 2 tools
+and then save it as a template manually in TimeLog's UI.
+
+**No DELETE for constructed resources.** There is no DELETE for projects, tasks,
+contracts, or payments. A mistaken create is permanent; it can only be
+neutralised by archiving the Project. Every create endpoint has a paired
+`validate-*` endpoint that writes nothing — this powers the preview step.

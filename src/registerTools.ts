@@ -4,8 +4,16 @@ import type { ToolDef } from "./tools/types.js";
 import { projectReadTools } from "./tools/projectReads.js";
 import { relationReadTools } from "./tools/relationReads.js";
 import { projectWriteTools } from "./tools/projectWrites.js";
+import { constructionReadTools } from "./tools/constructionReads.js";
+import { constructionWriteTools } from "./tools/constructionWrites.js";
 
-export const allTools: ToolDef[] = [...projectReadTools, ...relationReadTools, ...projectWriteTools];
+export const allTools: ToolDef[] = [
+  ...projectReadTools,
+  ...relationReadTools,
+  ...projectWriteTools,
+  ...constructionReadTools,
+  ...constructionWriteTools,
+];
 
 export function registerTools(server: McpServer, client: TimeLogClient, tools: ToolDef[] = allTools): void {
   for (const tool of tools) {
