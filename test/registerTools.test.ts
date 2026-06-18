@@ -23,6 +23,13 @@ describe("allTools registry", () => {
     }
   });
 
+  it("includes the Phase 3 resource tools", () => {
+    const names = allTools.map((t) => t.name);
+    for (const expected of ["get_employee_workload", "book_workload"]) {
+      expect(names).toContain(expected);
+    }
+  });
+
   it("has no duplicate tool names", () => {
     const names = allTools.map((t) => t.name);
     expect(new Set(names).size).toBe(names.length);

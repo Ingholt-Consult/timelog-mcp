@@ -6,6 +6,8 @@ import { relationReadTools } from "./tools/relationReads.js";
 import { projectWriteTools } from "./tools/projectWrites.js";
 import { constructionReadTools } from "./tools/constructionReads.js";
 import { constructionWriteTools } from "./tools/constructionWrites.js";
+import { resourceReadTools } from "./tools/resourceReads.js";
+import { resourceWriteTools } from "./tools/resourceWrites.js";
 
 export const allTools: ToolDef[] = [
   ...projectReadTools,
@@ -13,6 +15,8 @@ export const allTools: ToolDef[] = [
   ...projectWriteTools,
   ...constructionReadTools,
   ...constructionWriteTools,
+  ...resourceReadTools,
+  ...resourceWriteTools,
 ];
 
 export function registerTools(server: McpServer, client: TimeLogClient, tools: ToolDef[] = allTools): void {
