@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { ToolDef } from "./types.js";
+import type { TimeLogClient } from "../client.js";
 import { unwrapList } from "./unwrap.js";
 
 // GET /employee-projection/get-in-period returns Kapacitet/Arbejdsbyrde per
@@ -9,6 +10,22 @@ import { unwrapList } from "./unwrap.js";
 // no employee filter. We page with a generous $pagesize and unwrap the rows; for a
 // very large window the caller should narrow the dates.
 const PROJECTION_PAGESIZE = 1000;
+
+// Shared by get_employee_workload (returned as-is) and book_workload's synthetic
+// preview (filtered to the booked Employee), so the paging/unwrap lives in one place.
+export async function fetchEmployeeProjection(
+  client: TimeLogClient,
+  args: { startDate: string; endDate: string; includeAllEmployees?: boolean },
+): Promise<Record<string, unknown>[]> {
+  return unwrapList(
+    await client.get("/employee-projection/get-in-period", {
+      startDate: args.startDate,
+      endDate: args.endDate,
+      includeAllEmployees: args.includeAllEmployees,
+      $pagesize: PROJECTION_PAGESIZE,
+    }),
+  );
+}
 
 export const resourceReadTools: ToolDef[] = [
   {
@@ -23,14 +40,11 @@ export const resourceReadTools: ToolDef[] = [
         .optional()
         .describe("If true, include all Employees; otherwise only those assigned in the period."),
     },
-    handler: async (client, args) =>
-      unwrapList(
-        await client.get("/employee-projection/get-in-period", {
-          startDate: args.startDate as string,
-          endDate: args.endDate as string,
-          includeAllEmployees: args.includeAllEmployees as boolean | undefined,
-          $pagesize: PROJECTION_PAGESIZE,
-        }),
-      ),
+    handler: (client, args) =>
+      fetchEmployeeProjection(client, {
+        startDate: args.startDate as string,
+        endDate: args.endDate as string,
+        includeAllEmployees: args.includeAllEmployees as boolean | undefined,
+      }),
   },
 ];
