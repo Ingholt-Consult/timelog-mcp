@@ -2,6 +2,16 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Execution deviations (2026-06-18, from the empirical gate):** (1) The capacity
+> projection carries capacity only, not booked hours, so the `overbooking` flag was
+> dropped — preview surfaces the booked Employee's capacity rows and the agent
+> judges. (2) `employee-projection` is a paging TAFList that caps at 10 without
+> `$pagesize`, so `get_employee_workload` pages (`$pagesize` 1000) and unwraps; a
+> shared `fetchEmployeeProjection` helper serves both the read tool and the booking
+> preview. (3) Allocation is **unresolved, not closed** — `/allocation` returns 405
+> (route exists), so ADR 0007 defers it pending a non-GET probe rather than
+> declaring it out of scope. Runbook: `docs/runbooks/empirical-book-workload.md`.
+
 **Goal:** Add two MCP tools — `get_employee_workload` (read Employee Kapacitet/Arbejdsbyrde) and `book_workload` (create a Booking on a Task) — following the established Phase 1/2 patterns, with a synthetic capacity-based preview for the irreversible booking write.
 
 **Architecture:** New `resourceReads.ts` / `resourceWrites.ts` tool modules plus a `resourceSchemas.ts` Zod shape, mirroring the construction modules. Because `POST /workload/book` has no `validate-*` twin, a new `runBooking` helper synthesises the preview by reading `employee-projection` instead of delegating to a validate endpoint (unlike `runWrite`). An empirical gate runs first to confirm the real field binding and booking semantics before the schema descriptions are locked.
