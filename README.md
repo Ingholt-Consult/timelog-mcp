@@ -1,4 +1,4 @@
-# TimeLog MCP (Phases 1–2)
+# TimeLog MCP (Phases 1–3)
 
 A localhost MCP server for administering TimeLog projects via the REST API (v1).
 
@@ -31,14 +31,19 @@ read from `TIMELOG_PAT`, or per request from an `Authorization: Bearer <pat>` he
 | Update project fields (11 fields, read-modify-write, one project per call) | Bulk-update many projects in one call |
 | Set project status (0–6) and time-tracking toggle | Touch time registrations, expenses, or invoicing |
 | **Create a project from a template** (`create_project_from_template`) | Create employees / change working time |
-| **Add tasks and sub-tasks** (`create_task`) | Book resources / allocate (planned for Phase 3) |
-| **Add T&M and fixed-price contracts** (`create_time_material_contract`, `create_fixed_price_contract`) | |
-| **Add payment-plan lines** (`create_payment`) | |
+| **Add tasks and sub-tasks** (`create_task`) | Undo a **Booking** — `/workload/book` has no DELETE (remove it manually in the Resource Planner UI) |
+| **Add T&M and fixed-price contracts** (`create_time_material_contract`, `create_fixed_price_contract`) | Compute an overbooking verdict — the capacity projection does not expose already-booked hours |
+| **Add payment-plan lines** (`create_payment`) | **Allocate** an Employee to a Task beyond its budget — no confirmed v1 write endpoint (see ADR 0007) |
 | Read the supporting data: templates, tasks, task types, contracts, payments, hourly rates | |
+| **Read Employee Kapacitet over a period** (`get_employee_workload`) | |
+| **Book hours for an Employee on a Task** (`book_workload`, synthetic capacity preview) | |
 
 Every write tool runs in **preview** mode by default — it validates against
 TimeLog's paired `validate-*` endpoint and shows exactly what would be created —
 and only writes when called again with `mode: "execute"` after you confirm.
+`book_workload` is the exception: `/workload/book` has no `validate-*` endpoint and
+no undo, so its preview is *synthesised* — it reads the Employee's capacity for the
+period and warns that a Booking cannot be reversed via the API (see ADR 0007).
 
 Mass changes are orchestrated in conversation: list → confirm the set → one
 write per resource → per-resource result. See `docs/superpowers/specs/` for the

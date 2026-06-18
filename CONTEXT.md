@@ -119,6 +119,27 @@ A billing rate (`HourlyRateID`) that a Task references for its budget; resolved
 per Contract via `GET /contract-hourly-rate?contractID=`.
 _Avoid_: price, tariff.
 
+**Booking**:
+Hours placed for an Employee on a Task across a period — the unit of the Resource
+Planner (Ressourceplanlægger). Created via `POST /workload/book`
+(`EmployeeId`/`TaskId`/`Hours`/`StartDate`/`EndDate`; note the `EmployeeId`/`TaskId`
+casing, not `...ID`). Distinct from **Allocation**. The endpoint has no `validate-*`
+twin and no DELETE (see API conventions › No booking validate / no booking undo).
+_Avoid_: allocation (that is the separate concept below).
+
+**Allocation**:
+The budget hours a Task carries for an Employee (`BudgetHours` on the Task) — the
+"how much", versus a Booking's "when". Set via the Task (Phase 2 `create_task`).
+Pure Allocation of an Employee to a Task beyond the Task budget has **no confirmed
+v1 write endpoint** — `GET /allocation` returns 405 (the route exists but not for
+GET); a write route is unconfirmed (see ADR 0007). _Avoid_: booking.
+
+**Workload / Capacity**:
+An Employee's scheduled capacity over a period — normal working hours per day, read
+via `GET /employee-projection/get-in-period` (a paging TAFList). It carries capacity
+(`NormalWorkingHours`) and closed/approval flags only, **not** already-booked hours.
+_Avoid_: availability (informal).
+
 ## API conventions
 
 Conventions that hold across TimeLog's REST API (v1), learned empirically — apply
@@ -157,3 +178,12 @@ and then save it as a template manually in TimeLog's UI.
 contracts, or payments. A mistaken create is permanent; it can only be
 neutralised by archiving the Project. Every create endpoint has a paired
 `validate-*` endpoint that writes nothing — this powers the preview step.
+
+**No booking validate / no booking undo.** `POST /workload/book` (Booking) is the
+exception to the rule above: it has **no** paired `validate-*` endpoint and **no**
+DELETE — a Booking cannot be previewed dry or undone via the API, and (unlike a
+create) cannot even be archived away. `book_workload`'s preview is therefore
+*synthesised* from `GET /employee-projection/get-in-period`: it surfaces the
+Employee's capacity for the period (not a server-computed verdict, consistent with
+ADR 0006), since the projection does not expose already-booked hours. A mistaken
+Booking can only be removed manually in the Resource Planner UI. See ADR 0007.
