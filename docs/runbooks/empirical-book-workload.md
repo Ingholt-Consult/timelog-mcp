@@ -63,6 +63,15 @@ write was attempted (`DO_REAL_BOOKING` not set).
   scope (ADR 0007), probe `/allocation` with a non-GET method (e.g. POST an empty
   body and read the error) to see whether a write route is actually there.
 
+## Gate status
+
+**Partial — enough to build, two items open.** Confirmed: the required fields and
+casing for `/workload/book`, the projection's shape/paging/capacity-only nature, and
+that overbooking cannot be computed. These are folded into `resourceSchemas.ts`,
+`resourceReads.ts`, `resourceWrites.ts`, CONTEXT.md, and ADR 0007. The tools are
+built and tested against these findings. The items below remain before the gate is
+called complete.
+
 ## Still open (not yet run)
 
 1. **`Hours`-over-period semantics** — does a booking spread `Hours` across
