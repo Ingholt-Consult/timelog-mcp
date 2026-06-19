@@ -1,4 +1,10 @@
-# Booking uses a synthetic capacity preview; Allocation write is unresolved
+# Booking uses a synthetic capacity preview; Allocation write is confirmed but deferred
+
+> **SUPERSEDED by ADR 0008 (2026-06-19).** The empirical gate's final round showed
+> `POST /workload/book` (Booking) is non-functional — it rejects every valid `UserID`
+> with `ErrorCode 37040` — so the synthetic-preview booking tool this ADR describes
+> cannot work. `POST /allocation` is the only working resource write. See ADR 0008.
+> The rest of this file is kept for the record.
 
 Phase 3 adds resource booking. The empirical gate (2026-06-18,
 `docs/runbooks/empirical-book-workload.md`) established that the v1 API's
@@ -36,22 +42,32 @@ The projection carries **capacity only** (`NormalWorkingHours` per day) — it d
   does not already hold (capacity), and does **not** re-resolve Task/Employee names
   the caller already has. Capacity is surfaced; display-name enrichment is not.
 
-## Allocation write is UNRESOLVED (not closed)
+## Allocation write is CONFIRMED writable; scope is pending (not unresolved)
 
-Pure Allocation — assigning an Employee to a Task beyond the Task's budget hours —
-was hypothesised out of scope on the theory that `AllocationController` is an empty
-stub. The gate **weakened** that hypothesis: `GET /allocation` returns **405
-UnsupportedApiVersion** ("does not support HTTP method 'GET'"), not 404. The route
-**exists** but does not serve GET at v1, which leaves open that a POST/PUT write
-route exists.
+Pure Allocation — assigning an Employee to a Task — was first hypothesised out of
+scope on the theory that `AllocationController` is an empty stub. Dry round 1
+weakened that (`GET /allocation` → 405, not 404). **Dry round 2 (2026-06-19)
+overturned it:** `POST /allocation` returns **400 FluentValidation**, binding an
+`allocationCreateModel` and requiring `UserId` (> 0) and `TaskId` (> 0); `GET` and
+`PUT` are both 405 (`UnsupportedApiVersion`). So at v1 `/allocation` is a real,
+**POST-only create route**. Allocation **is** writable via the API.
 
-Therefore Allocation is **deferred, not declared out of scope.** Before any ADR
-closes it the way "No template write" was closed, the gate must probe `/allocation`
-with a non-GET method (POST an empty body and read the error envelope). Until then:
+Note the casing: `UserId` (matching the projection's `UserID`), **not** `EmployeeId`
+as `/workload/book` uses; both use `TaskId`.
+
+Allocation is therefore **confirmed writable but deliberately not built in this
+phase — scope is pending, not the API's existence.** The open question is the create
+model's **full field set**: the empty-body echo showed only `{UserId, TaskId}`, yet
+the domain (`docs/timelog/04-employees-and-resources.md`) defines an Allocation as
+*hours* assigned to an Employee on a Task. Whether `allocationCreateModel` carries
+hours/budget/period fields, or only the two ids (with hours set elsewhere), is being
+probed non-destructively by `test/manual/empirical-allocation-fields.mjs` before any
+`create_allocation` tool is designed. Until that decision:
 - `book_workload` covers **Booking** only.
 - Allocation-as-Task-budget remains available via Phase 2 `create_task`
   (`BudgetHours`).
-- CONTEXT.md records Allocation's write status as unconfirmed.
+- CONTEXT.md records Allocation's write status as **confirmed writable, tool not yet
+  built (POST-only, requires `UserId` + `TaskId`; full field set under probe).**
 
 ## Consequences
 

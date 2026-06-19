@@ -120,19 +120,24 @@ per Contract via `GET /contract-hourly-rate?contractID=`.
 _Avoid_: price, tariff.
 
 **Booking**:
-Hours placed for an Employee on a Task across a period — the unit of the Resource
-Planner (Ressourceplanlægger). Created via `POST /workload/book`
-(`EmployeeId`/`TaskId`/`Hours`/`StartDate`/`EndDate`; note the `EmployeeId`/`TaskId`
-casing, not `...ID`). Distinct from **Allocation**. The endpoint has no `validate-*`
-twin and no DELETE (see API conventions › No booking validate / no booking undo).
-_Avoid_: allocation (that is the separate concept below).
+A niche TimeLog concept — a manual or **Outlook-appointment-captured** hour post
+(Tracker for Outlook), **not** general resource planning. `POST /workload/book`
+(`WorkloadApiCreateModel` = `EmployeeId`/`TaskId`/`Hours`/`StartDate`/`EndDate`) is
+**non-functional via the API**: it rejects every valid `UserID` with `ErrorCode 37040`
+"No user with UserID" (empirical 2026-06-19, see ADR 0008). Do not build on it.
+_Avoid_: using "booking" for resource planning — that is **Allocation** + **Resource
+Planner** below.
 
 **Allocation**:
-The budget hours a Task carries for an Employee (`BudgetHours` on the Task) — the
-"how much", versus a Booking's "when". Set via the Task (Phase 2 `create_task`).
-Pure Allocation of an Employee to a Task beyond the Task budget has **no confirmed
-v1 write endpoint** — `GET /allocation` returns 405 (the route exists but not for
-GET); a write route is unconfirmed (see ADR 0007). _Avoid_: booking.
+Assignment of an Employee (resource) to a Task — the user's step 1 ("how many" hours).
+**The working resource write in v1:** `POST /allocation` (POST-only — `GET`/`PUT` are
+405; no DELETE), model = exactly `{UserId, TaskId}` (`UserId` is a real `UserID`).
+Returns 200 and **adds the user as a resource on the task at 0 allocated hours**
+(confirmed in UI). Build `create_allocation` on this (ADR 0008). How allocated
+hours/budget get set via the API is unverified — gate before promising hour-level
+allocation; task-budget hours are settable via Phase 2 `create_task` (`BudgetHours`).
+Planning *when* the hours fall = the **Resource Planner** (V2 `ResourcePlannerController`),
+which is **not reachable — API v2 is not live** on this instance. _Avoid_: booking.
 
 **Workload / Capacity**:
 An Employee's scheduled capacity over a period — normal working hours per day, read
