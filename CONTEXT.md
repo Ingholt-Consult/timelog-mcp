@@ -119,25 +119,32 @@ A billing rate (`HourlyRateID`) that a Task references for its budget; resolved
 per Contract via `GET /contract-hourly-rate?contractID=`.
 _Avoid_: price, tariff.
 
+**Resource Planner** (the resource-planning surface — ADR 0009):
+Planning an Employee's hours on a Task over a period. The **working, PAT-authed**
+write is **`POST /api/v2/resource-planner/book-hours`** `{resourceId, workItemId,
+unitType:"hours", value, startsAt, endsAt}` → 200 (no SignalR hub needed). `value` =
+total hours spread evenly per day over `[startsAt, endsAt]`; **idempotent REPLACE**,
+not additive. The opaque `resourceId`/`workItemId` are resolved from `UserID`/`TaskID`
+via the v2 reads `partial-group-by-employee` (resource rows → `resourceId`) and
+`partial-group-by-work-item` (work-item rows → `workItemId`); each row's
+`*SourceReferenceId` is the v1 id, and `EmployeeIds=<UserID>` filters. API v2 IS live
+and PAT-authed (these routes are undocumented — gate before relying).
+
 **Booking**:
 A niche TimeLog concept — a manual or **Outlook-appointment-captured** hour post
 (Tracker for Outlook), **not** general resource planning. `POST /workload/book`
-(`WorkloadApiCreateModel` = `EmployeeId`/`TaskId`/`Hours`/`StartDate`/`EndDate`) is
-**non-functional via the API**: it rejects every valid `UserID` with `ErrorCode 37040`
-"No user with UserID" (empirical 2026-06-19, see ADR 0008). Do not build on it.
-_Avoid_: using "booking" for resource planning — that is **Allocation** + **Resource
-Planner** below.
+(`WorkloadApiCreateModel`) is **non-functional via the API**: it rejects every valid
+`UserID` with `ErrorCode 37040` "No user with UserID" (ADR 0008). Do not build on it —
+use the **Resource Planner** above. _Avoid_: using "booking" for resource planning.
 
 **Allocation**:
-Assignment of an Employee (resource) to a Task — the user's step 1 ("how many" hours).
-**The working resource write in v1:** `POST /allocation` (POST-only — `GET`/`PUT` are
-405; no DELETE), model = exactly `{UserId, TaskId}` (`UserId` is a real `UserID`).
-Returns 200 and **adds the user as a resource on the task at 0 allocated hours**
-(confirmed in UI). Build `create_allocation` on this (ADR 0008). How allocated
-hours/budget get set via the API is unverified — gate before promising hour-level
-allocation; task-budget hours are settable via Phase 2 `create_task` (`BudgetHours`).
-Planning *when* the hours fall = the **Resource Planner** (V2 `ResourcePlannerController`),
-which is **not reachable — API v2 is not live** on this instance. _Avoid_: booking.
+Assignment of an Employee (resource) to a Task — adds task membership. `POST /allocation`
+(POST-only — `GET`/`PUT` 405; no DELETE), model = exactly `{UserId, TaskId}` (`UserId`
+is a real `UserID`), returns 200 and **adds the user as a resource on the task at 0
+allocated hours** (confirmed in UI). Hours are NOT set here — that is the Resource
+Planner's `book-hours` above. Whether allocation is a precondition for `book-hours` is
+unverified (gate). Task-budget hours are settable via Phase 2 `create_task`
+(`BudgetHours`). _Avoid_: booking.
 
 **Workload / Capacity**:
 An Employee's scheduled capacity over a period — normal working hours per day, read

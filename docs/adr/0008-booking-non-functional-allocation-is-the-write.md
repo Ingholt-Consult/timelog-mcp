@@ -1,5 +1,11 @@
 # Booking is non-functional; Allocation is the resource write
 
+> **SUPERSEDED by ADR 0009 (2026-06-19).** This ADR's claim that "v2 is not live" was
+> wrong (wrong route guesses + `/user/me` is not a v2 controller). The real resource-
+> planning write is `POST /api/v2/resource-planner/book-hours` (PAT-authed, proven).
+> The booking-is-dead and allocation findings below still hold; the v2 conclusion does
+> not. See ADR 0009.
+
 Supersedes **ADR 0007**. Phase 3 set out to add *resource booking* via
 `POST /workload/book`. The empirical gate's final round (2026-06-19, full log
 `docs/runbooks/empirical-book-workload.md`) showed that premise is wrong on two

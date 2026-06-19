@@ -129,23 +129,54 @@ The decisive round. Scripts: `empirical-book-workload.mjs` (with `DO_REAL_BOOKIN
   and `V1.ProjectManagement...AllocationController` as tags but documents **no paths**
   for either; only `/v{version}/workload/book` is pathed (so `/allocation` works live
   yet is absent from the spec — the spec is incomplete).
-- **API v2 is NOT live:** `/api/v2/user/me` → 404 "does not support the API version
-  '2'"; every `/api/v2/resource-planner*` guess → 404; the `api-version` header is
-  ignored (versioning is URL-segment based). Only v1 is served on app5/ingholtconsult2.
+- ~~**API v2 is NOT live**~~ — **WRONG, corrected in round 4 below.** The guess
+  `/api/v2/user/me` 404'd because `user` is not a v2 controller, and the
+  `resource-planner` route *names* were wrong. v2 IS live for the resource planner.
+
+**2026-06-19 (mrt) — round 4 (browser capture + V2 resource planner). THE ANSWER.**
+Captured the live UI's calls and probed them with our PAT. Scripts:
+`discover-v2-book-hours.mjs`, `discover-v2-resource-mapping.mjs`,
+`discover-v2-resource-id.mjs`, `discover-allocation-hours.mjs`.
+
+### `POST /api/v2/resource-planner/book-hours` WORKS with our PAT
+
+- Empty body → 500 `"ResourceId cannot be null"` (NOT 401 → **PAT authenticates on
+  v2**; TenantId 35564 resolves from the PAT). A real call with
+  `{resourceId, workItemId, unitType:"hours", value, startsAt, endsAt}` → **200 "OK"**,
+  **no `hubConnectionId` needed** (the browser sends one for live UI updates only).
+- **Semantics (controlled test on a clean task):** `value` = TOTAL hours spread
+  EVENLY per day across `[startsAt, endsAt]` (value 2 over 2 days → 1 h/day), and it
+  **REPLACES** per resource+workItem+period (value 3 → 1.5 h/day, not additive). The
+  round-3 "additive 0.66" was a misleading month-aggregate cell, not raw per-day hours.
+
+### The v1 ↔ v2 id bridge (both POST, params in query, empty body)
+
+- `POST /api/v2/resource-planner/partial-group-by-work-item?groupedby=groupbyworkitem&…&EmployeeIds=<UserID>`
+  → `workItemSourceReferenceId` = **TaskID** ↔ opaque `workItemId`.
+- `POST /api/v2/resource-planner/partial-group-by-employee?groupedby=groupbyresource&…&EmployeeIds=<UserID>`
+  → `resourceSourceReferenceId` = **UserID** ↔ opaque `resourceId` (constant per
+  employee; `resourceType:"Employee"`). MRT/29 → `512272789219049472`; task 4961 →
+  `512272894517051410`.
+- `partial-group-by-resource` 404; `group-by-employee` 405 (POST unsupported);
+  `…-total-row` variants return only the footer aggregate.
 
 ## Gate status
 
-**Closed — reversed premise.** Booking is non-functional and conceptually
-mislabelled; the Resource Planner "when" step needs v2, which is not live; **only
-`POST /allocation` works**. Phase 3's resource-write surface = Allocation alone.
-Action items: build `create_allocation`; retire/flag `book_workload`; fix the glossary
-(Allocation + Resource Planner are the concepts, Booking is a niche Outlook post);
-ADR 0007 superseded (see ADR 0008). Cleanup: remove the MRT→4961 allocation in the UI
-(no API DELETE).
+**Closed — the resource-planning surface is the V2 resource planner (ADR 0009).**
+Write via `book-hours`, map ids via the two `partial-group-by-*` reads — all PAT-authed.
+Action items: build the resource-planning tool on v2; retire `book_workload`
+(`/workload/book`, dead — 37040); `/allocation` (v1) stays as the task-membership write.
+ADR 0007 → 0008 → **0009** (superseded chain). Glossary + CONTEXT corrected. Open:
+working-day distribution; allocation-as-precondition for book-hours; clearing hours
+(value 0?). No DELETE — remove gate writes (MRT allocation + July test book-hours) in UI.
 
 ## Resolved
 
-1. **`Hours`-over-period semantics / 200-vs-202** — UNVERIFIABLE: `/workload/book`
-   never succeeds (37040). Closed as "booking non-functional", not measured.
-2. **`/allocation` write probe** — RESOLVED: works, POST-only, model `{UserId, TaskId}`,
-   adds a task resource at 0 h (confirmed in UI).
+1. **Resource-planning write** — `POST /api/v2/resource-planner/book-hours` (PAT, 200,
+   no hub; value = total spread evenly per day, REPLACE). The v1 `/workload/book`
+   Booking path is dead (37040) and was the wrong concept.
+2. **`Hours`-over-period semantics** — value = total, distributed evenly per day over
+   the period (measured on the v2 endpoint, not the dead v1 one).
+3. **v1↔v2 id mapping** — via `partial-group-by-employee` / `partial-group-by-work-item`.
+4. **`/allocation` write** — works, POST-only, `{UserId, TaskId}`, adds a 0 h task
+   resource.
