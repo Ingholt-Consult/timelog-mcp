@@ -32,30 +32,3 @@ export async function runWrite(client: TimeLogClient, opts: RunWriteOptions): Pr
   }
   return { mode: "preview", validation, payload: opts.body };
 }
-
-export interface RunBookingOptions {
-  mode: WriteMode;
-  bookPath: string;
-  body: Record<string, unknown>;
-  // Synthetic-preview source: read capacity for the period. /workload/book has no
-  // validate-* twin (see ADR 0007), so preview surfaces capacity instead — the one
-  // "dry" signal the API offers. It does NOT re-resolve Task/Employee names (ADR 0006).
-  previewCapacity: () => Promise<unknown>;
-}
-
-const BOOKING_IRREVERSIBLE_NOTE =
-  "En Booking kan IKKE fortrydes via API'et — der er ingen DELETE. Bekræft før du kører execute.";
-
-export async function runBooking(client: TimeLogClient, opts: RunBookingOptions): Promise<unknown> {
-  if (opts.mode === "execute") {
-    return client.post(opts.bookPath, opts.body);
-  }
-  // preview: read capacity for the period; surface failures rather than throwing.
-  let capacity: Record<string, unknown>;
-  try {
-    capacity = { ok: true, projection: await opts.previewCapacity() };
-  } catch (err) {
-    capacity = { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-  return { mode: "preview", capacity, note: BOOKING_IRREVERSIBLE_NOTE, payload: opts.body };
-}

@@ -1,19 +1,29 @@
 import { z } from "zod";
 import { modeField } from "./constructionSchemas.js";
 
-// POST /workload/book — WorkloadApiCreateModel. A Booking places hours for an
-// Employee on a Task across a period; it feeds the Resource Planner
-// (Ressourceplanlæggeren) and is DISTINCT from Allokering (a Task's budget hours).
-// NOTE: this endpoint has NO validate-* twin and NO DELETE — see runBooking and
-// ADR 0007. Field names use the EmployeeId / TaskId casing the booking model uses
-// (not the ...ID convention). Required fields confirmed by the empirical gate
-// (docs/runbooks/empirical-book-workload.md): all five below, each must be > 0 /
-// a valid date.
-export const bookWorkloadShape = {
+// POST /api/v2/resource-planner/book-hours (the Resource Planner — Ressourceplanlægger,
+// ADR 0009). Input is in the v1 ids the agent holds (UserID/TaskID); the tool resolves
+// the opaque v2 resourceId/workItemId itself. `value` = TOTAL hours spread EVENLY per
+// day across [startsAt, endsAt] and is an idempotent REPLACE (not additive). There is
+// NO validate-* twin and NO DELETE — preview reads the current plan instead of a dry
+// verdict (ADR 0006), and clearing means re-planning with value 0 / the UI.
+export const planResourceHoursShape = {
   ...modeField,
-  EmployeeId: z.number().int().describe("UserID of the Employee (Medarbejder) to book (see list_users). Required, must be > 0."),
-  TaskId: z.number().int().describe("TaskID to book hours on (see list_tasks). Required, must be > 0 — the Opgave must accept time (status 'I gang', not a summation task)."),
-  Hours: z.number().describe("Hours (timer) to book for the period. Required, must be > 0."),
-  StartDate: z.string().describe("Booking start date, ISO 8601 (e.g. 2026-06-22T00:00:00). Required."),
-  EndDate: z.string().describe("Booking end date, ISO 8601. Required."),
+  UserID: z.number().int().describe("UserID of the Employee (Medarbejder) to plan (see list_users). Required, > 0."),
+  TaskID: z.number().int().describe("TaskID to plan hours on (see list_tasks). Required, > 0 — the Opgave must be planned for the Employee in the Resource Planner (allocated)."),
+  value: z.number().describe("TOTAL hours (timer) for the whole period — distributed EVENLY per day across [startsAt, endsAt]. REPLACES any existing plan for this Employee+Opgave+period (not additive). Required."),
+  startsAt: z.string().describe("Period start, ISO 8601 (e.g. 2026-06-22T00:00:00). Required."),
+  endsAt: z.string().describe("Period end, ISO 8601. Required."),
+} as const;
+
+// Read params for get_resource_plan — an Employee's plan over a period via the v2
+// partial-group-by-work-item read. Reporting overrides let the caller pull other
+// figures (e.g. a different reportingtypes) without changing code.
+export const getResourcePlanShape = {
+  UserID: z.number().int().describe("UserID of the Employee (Medarbejder) whose plan to read (see list_users). Required, > 0."),
+  startsAt: z.string().describe("Period start, ISO 8601 (e.g. 2026-06-01T00:00:00). Required."),
+  endsAt: z.string().describe("Period end, ISO 8601. Required."),
+  periodTypes: z.string().optional().describe("How periods are bucketed (default 'month'; e.g. 'week', 'day')."),
+  unitTypes: z.string().optional().describe("Unit of the figures (default 'hours')."),
+  reportingTypes: z.string().optional().describe("Which figures to report (default 'utilization')."),
 } as const;

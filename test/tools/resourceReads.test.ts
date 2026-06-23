@@ -8,9 +8,67 @@ function byName(name: string) {
   return tool;
 }
 
+const byWorkItemResp = {
+  Model: {
+    properties: {
+      workItemSourceReferenceId: 0,
+      children: [
+        { workItemSourceReferenceId: 4961, workItemId: "WI-4961", name: "Task 4961", TotalBooked: 3, values: { "2026-06": { value: 1.5 } }, children: [] },
+      ],
+    },
+  },
+};
+
 describe("resource read tools", () => {
-  it("exposes get_employee_workload", () => {
-    expect(resourceReadTools.map((t) => t.name)).toEqual(["get_employee_workload"]);
+  it("exposes get_employee_workload and get_resource_plan", () => {
+    expect(resourceReadTools.map((t) => t.name).sort()).toEqual(
+      ["get_employee_workload", "get_resource_plan"].sort(),
+    );
+  });
+
+  it("get_resource_plan reads the v2 work-item plan for the Employee and returns normalized rows", async () => {
+    const postV2 = vi.fn(async () => byWorkItemResp);
+    const client = { postV2 } as unknown as TimeLogClient;
+
+    const result = await byName("get_resource_plan").handler(client, {
+      UserID: 29,
+      startsAt: "2026-06-01T00:00:00",
+      endsAt: "2026-06-30T00:00:00",
+    });
+
+    expect(postV2).toHaveBeenCalledWith(
+      "/resource-planner/partial-group-by-work-item",
+      {},
+      expect.objectContaining({
+        groupedby: "groupbyworkitem",
+        EmployeeIds: 29,
+        periodstartsat: "2026-06-01",
+        periodendsat: "2026-06-30",
+        periodtypes: "month",
+      }),
+    );
+    expect(result).toEqual([
+      { TaskID: 4961, workItemId: "WI-4961", name: "Task 4961", TotalBooked: 3, values: { "2026-06": { value: 1.5 } } },
+    ]);
+  });
+
+  it("get_resource_plan forwards reporting overrides", async () => {
+    const postV2 = vi.fn(async () => byWorkItemResp);
+    const client = { postV2 } as unknown as TimeLogClient;
+
+    await byName("get_resource_plan").handler(client, {
+      UserID: 29,
+      startsAt: "2026-06-01T00:00:00",
+      endsAt: "2026-06-30T00:00:00",
+      periodTypes: "week",
+      reportingTypes: "eac",
+    });
+
+    expect(postV2).toHaveBeenCalledWith(
+      "/resource-planner/partial-group-by-work-item",
+      {},
+      expect.objectContaining({ periodtypes: "week", reportingtypes: "eac" }),
+    );
   });
 
   it("get_employee_workload pages with $pagesize, passes the period params, and unwraps the rows", async () => {

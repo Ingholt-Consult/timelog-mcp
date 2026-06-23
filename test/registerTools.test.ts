@@ -25,9 +25,13 @@ describe("allTools registry", () => {
 
   it("includes the Phase 3 resource tools", () => {
     const names = allTools.map((t) => t.name);
-    for (const expected of ["get_employee_workload", "book_workload"]) {
+    for (const expected of ["get_employee_workload", "get_resource_plan", "plan_resource_hours"]) {
       expect(names).toContain(expected);
     }
+  });
+
+  it("no longer exposes the retired book_workload tool", () => {
+    expect(allTools.map((t) => t.name)).not.toContain("book_workload");
   });
 
   it("has no duplicate tool names", () => {

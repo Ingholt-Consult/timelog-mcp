@@ -68,4 +68,34 @@ describe("TimeLogClient", () => {
 
     expect(await client.post("/task", { TaskName: "x" })).toBeNull();
   });
+
+  it("postV2 targets the v2 base (derived from the v1 base) with a JSON body", async () => {
+    const f = fakeFetch(200, "OK");
+    const client = new TimeLogClient({ baseUrl: "https://x/api/v1", pat: "tok", fetchImpl: f });
+
+    await client.postV2("/resource-planner/book-hours", { resourceId: "1", value: "2" });
+
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe("https://x/api/v2/resource-planner/book-hours");
+    expect((init as RequestInit).method).toBe("POST");
+    expect((init as RequestInit).body).toBe(JSON.stringify({ resourceId: "1", value: "2" }));
+    expect((init as RequestInit).headers).toMatchObject({ Authorization: "Bearer tok" });
+  });
+
+  it("postV2 appends query params and still sends the (empty) body", async () => {
+    const f = fakeFetch(200, { Model: {} });
+    const client = new TimeLogClient({ baseUrl: "https://x/api/v1", pat: "tok", fetchImpl: f });
+
+    await client.postV2("/resource-planner/partial-group-by-work-item", {}, {
+      groupedby: "groupbyworkitem",
+      EmployeeIds: 29,
+      IsEmployeeInclusive: true,
+    });
+
+    const [url, init] = f.mock.calls[0];
+    expect(url).toBe(
+      "https://x/api/v2/resource-planner/partial-group-by-work-item?groupedby=groupbyworkitem&EmployeeIds=29&IsEmployeeInclusive=true",
+    );
+    expect((init as RequestInit).body).toBe("{}");
+  });
 });

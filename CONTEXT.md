@@ -191,11 +191,13 @@ contracts, or payments. A mistaken create is permanent; it can only be
 neutralised by archiving the Project. Every create endpoint has a paired
 `validate-*` endpoint that writes nothing — this powers the preview step.
 
-**No booking validate / no booking undo.** `POST /workload/book` (Booking) is the
-exception to the rule above: it has **no** paired `validate-*` endpoint and **no**
-DELETE — a Booking cannot be previewed dry or undone via the API, and (unlike a
-create) cannot even be archived away. `book_workload`'s preview is therefore
-*synthesised* from `GET /employee-projection/get-in-period`: it surfaces the
-Employee's capacity for the period (not a server-computed verdict, consistent with
-ADR 0006), since the projection does not expose already-booked hours. A mistaken
-Booking can only be removed manually in the Resource Planner UI. See ADR 0007.
+**No resource-planning validate / no undo.** The Resource Planner write
+`POST /api/v2/resource-planner/book-hours` (ADR 0009) is the exception to the rule
+above: it has **no** paired `validate-*` endpoint and **no** DELETE. `plan_resource_hours`'s
+preview is therefore *synthesised* from the planner reads: it resolves the opaque ids,
+surfaces the **current** plan for the target Opgave (booked per period, from
+`partial-group-by-work-item`), and echoes the exact payload — not a server-computed
+verdict (consistent with ADR 0006). Because `book-hours` is an idempotent REPLACE, a
+mistaken plan is overwritten by re-planning (clear with `value` 0 — unverified — or in
+the Resource Planner UI), not undone. The dead v1 `POST /workload/book` (Booking,
+37040) was removed along with its `book_workload` tool — see ADR 0008 → 0009.

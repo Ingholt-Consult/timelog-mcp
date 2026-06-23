@@ -8,74 +8,119 @@ function byName(name: string) {
   return tool;
 }
 
+const byResourceResp = {
+  Model: {
+    properties: {
+      resourceSourceReferenceId: 0,
+      children: [
+        { resourceSourceReferenceId: 29, resourceId: "RES-29", resourceType: "Employee", children: [] },
+      ],
+    },
+  },
+};
+const byWorkItemResp = {
+  Model: {
+    properties: {
+      workItemSourceReferenceId: 0,
+      children: [
+        { workItemSourceReferenceId: 4961, workItemId: "WI-4961", name: "Task 4961", TotalBooked: 3, values: { "2026-06": { value: 1.5 } }, children: [] },
+      ],
+    },
+  },
+};
+
+// Dispatch the v2 reads/writes by path so the handler's resolution flow can run.
+function makeClient() {
+  const calls: { path: string; body: unknown }[] = [];
+  const postV2 = vi.fn(async (path: string, body: unknown) => {
+    calls.push({ path, body });
+    if (path.includes("partial-group-by-employee")) return byResourceResp;
+    if (path.includes("partial-group-by-work-item")) return byWorkItemResp;
+    if (path.includes("book-hours")) return "OK";
+    return null;
+  });
+  return { client: { postV2 } as unknown as TimeLogClient, postV2, calls };
+}
+
 const fullArgs = (mode: string) => ({
   mode,
-  EmployeeId: 64,
-  TaskId: 34,
-  Hours: 8,
-  StartDate: "2026-06-22T00:00:00",
-  EndDate: "2026-06-26T00:00:00",
+  UserID: 29,
+  TaskID: 4961,
+  value: 8,
+  startsAt: "2026-06-22T00:00:00",
+  endsAt: "2026-06-26T00:00:00",
 });
 
 describe("resource write tools", () => {
-  it("exposes book_workload", () => {
-    expect(resourceWriteTools.map((t) => t.name)).toEqual(["book_workload"]);
+  it("exposes plan_resource_hours (and no longer book_workload)", () => {
+    expect(resourceWriteTools.map((t) => t.name)).toEqual(["plan_resource_hours"]);
   });
 
-  it("preview reads the period projection (never posts) and filters capacity to the booked Employee", async () => {
-    const post = vi.fn(async () => ({}));
-    const get = vi.fn(async () => ({
-      Entities: [
-        { Properties: { UserID: 64, Date: "2026-06-22T00:00:00", NormalWorkingHours: 7.5 } },
-        { Properties: { UserID: 65, Date: "2026-06-22T00:00:00", NormalWorkingHours: 7.5 } },
-      ],
-    }));
-    const client = { post, get } as unknown as TimeLogClient;
+  it("preview resolves the opaque ids, shows the current plan, echoes the payload, and never books", async () => {
+    const { client, postV2, calls } = makeClient();
 
-    const result = (await byName("book_workload").handler(client, fullArgs("preview"))) as {
-      mode: string; capacity: { ok: boolean; projection: Record<string, unknown>[] }; payload: Record<string, unknown>;
+    const result = (await byName("plan_resource_hours").handler(client, fullArgs("preview"))) as {
+      mode: string;
+      resolved: { resourceId: string; workItemId: string };
+      currentPlan: unknown;
+      payload: Record<string, unknown>;
+      note: string;
     };
 
-    expect(post).not.toHaveBeenCalled();
-    expect(get).toHaveBeenCalledWith("/employee-projection/get-in-period", {
-      startDate: "2026-06-22T00:00:00",
-      endDate: "2026-06-26T00:00:00",
-      includeAllEmployees: true,
-      $pagesize: 1000,
-    });
+    // No write: book-hours is never POSTed in preview.
+    expect(calls.some((c) => c.path.includes("book-hours"))).toBe(false);
+    expect(postV2).toHaveBeenCalledWith(
+      "/resource-planner/partial-group-by-employee",
+      {},
+      expect.objectContaining({ groupedby: "groupbyresource", EmployeeIds: 29 }),
+    );
     expect(result.mode).toBe("preview");
-    // Only the booked Employee's (UserID 64) capacity rows are surfaced.
-    expect(result.capacity.projection).toEqual([
-      { UserID: 64, Date: "2026-06-22T00:00:00", NormalWorkingHours: 7.5 },
-    ]);
+    expect(result.resolved).toEqual({ resourceId: "RES-29", workItemId: "WI-4961" });
+    // The current plan row for the target Task is surfaced so the REPLACE is visible.
+    expect(result.currentPlan).toMatchObject({ TaskID: 4961, TotalBooked: 3 });
+    // The payload is exactly what execute would send (value coerced to string).
     expect(result.payload).toEqual({
-      EmployeeId: 64, TaskId: 34, Hours: 8, StartDate: "2026-06-22T00:00:00", EndDate: "2026-06-26T00:00:00",
+      resourceId: "RES-29",
+      workItemId: "WI-4961",
+      unitType: "hours",
+      value: "8",
+      startsAt: "2026-06-22T00:00:00",
+      endsAt: "2026-06-26T00:00:00",
     });
+    expect(result.note).toMatch(/erstatter|replace/i);
   });
 
-  it("execute posts the booking body (no mode) to /workload/book", async () => {
-    const post = vi.fn(async () => ({ accepted: true }));
-    const get = vi.fn();
-    const client = { post, get } as unknown as TimeLogClient;
+  it("execute books the resolved hours via book-hours and returns the result", async () => {
+    const { client, calls } = makeClient();
 
-    const result = await byName("book_workload").handler(client, fullArgs("execute"));
+    const result = await byName("plan_resource_hours").handler(client, fullArgs("execute"));
 
-    expect(post).toHaveBeenCalledWith("/workload/book", {
-      EmployeeId: 64, TaskId: 34, Hours: 8, StartDate: "2026-06-22T00:00:00", EndDate: "2026-06-26T00:00:00",
+    const book = calls.find((c) => c.path.includes("book-hours"));
+    expect(book?.body).toEqual({
+      resourceId: "RES-29",
+      workItemId: "WI-4961",
+      unitType: "hours",
+      value: "8",
+      startsAt: "2026-06-22T00:00:00",
+      endsAt: "2026-06-26T00:00:00",
     });
-    expect(get).not.toHaveBeenCalled();
-    expect(result).toEqual({ accepted: true });
+    expect(result).toBe("OK");
   });
 
   it("defaults to preview when mode is omitted", async () => {
-    const post = vi.fn(async () => ({}));
-    const get = vi.fn(async () => ({ Entities: [] }));
-    const client = { post, get } as unknown as TimeLogClient;
-
+    const { client, calls } = makeClient();
     const { mode, ...noMode } = fullArgs("preview");
-    await byName("book_workload").handler(client, noMode);
 
-    expect(post).not.toHaveBeenCalled();
-    expect(get).toHaveBeenCalledTimes(1);
+    await byName("plan_resource_hours").handler(client, noMode);
+
+    expect(calls.some((c) => c.path.includes("book-hours"))).toBe(false);
+  });
+
+  it("surfaces a clear error when the Task is not planned for the Employee", async () => {
+    const { client } = makeClient();
+
+    await expect(
+      byName("plan_resource_hours").handler(client, { ...fullArgs("preview"), TaskID: 1234 }),
+    ).rejects.toThrow(/1234/);
   });
 });

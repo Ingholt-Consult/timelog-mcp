@@ -2,6 +2,8 @@ import { z } from "zod";
 import type { ToolDef } from "./types.js";
 import type { TimeLogClient } from "../client.js";
 import { unwrapList } from "./unwrap.js";
+import { getResourcePlanShape } from "../resourceSchemas.js";
+import { fetchResourcePlan } from "./resourcePlanner.js";
 
 // GET /employee-projection/get-in-period returns Kapacitet/Arbejdsbyrde per
 // Employee per day for the period. The empirical gate (2026-06-18) found it is a
@@ -11,8 +13,7 @@ import { unwrapList } from "./unwrap.js";
 // very large window the caller should narrow the dates.
 const PROJECTION_PAGESIZE = 1000;
 
-// Shared by get_employee_workload (returned as-is) and book_workload's synthetic
-// preview (filtered to the booked Employee), so the paging/unwrap lives in one place.
+// Backs get_employee_workload: pages with a generous $pagesize and unwraps the rows.
 export async function fetchEmployeeProjection(
   client: TimeLogClient,
   args: { startDate: string; endDate: string; includeAllEmployees?: boolean },
@@ -46,5 +47,22 @@ export const resourceReadTools: ToolDef[] = [
         endDate: args.endDate as string,
         includeAllEmployees: args.includeAllEmployees as boolean | undefined,
       }),
+  },
+  {
+    name: "get_resource_plan",
+    description:
+      "Show an Employee's (Medarbejder) plan in the Ressourceplanlægger over a period (v2 partial-group-by-work-item). Returns one row per planned Task (Opgave) with the TaskID, the opaque workItemId, the total booked, and the per-period figures (booked/actual/EAC per the chosen reportingtypes). Unlike get_employee_workload (capacity only), this shows the actually planned hours. Defaults: periodtypes=month, unittypes=hours, reportingtypes=utilization.",
+    inputSchema: getResourcePlanShape,
+    handler: (client, args) =>
+      fetchResourcePlan(
+        client,
+        args.UserID as number,
+        { startsAt: args.startsAt as string, endsAt: args.endsAt as string },
+        {
+          periodTypes: args.periodTypes as string | undefined,
+          unitTypes: args.unitTypes as string | undefined,
+          reportingTypes: args.reportingTypes as string | undefined,
+        },
+      ),
   },
 ];
