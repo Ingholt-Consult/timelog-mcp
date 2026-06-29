@@ -217,3 +217,14 @@ verdict (consistent with ADR 0006). Because `book-hours` is an idempotent REPLAC
 mistaken plan is overwritten by re-planning (clear with `value` 0 — unverified — or in
 the Resource Planner UI), not undone. The dead v1 `POST /workload/book` (Booking,
 37040) was removed along with its `book_workload` tool — see ADR 0008 → 0009.
+
+**Book-hours quirks (built flow proven end-to-end 2026-06-29).** Two gotchas confirmed
+live: (1) `book-hours` rejects a **fully past period** with a misleading
+`500 "end date is before start date"` — it appears to clamp the start to *today*, which
+inverts a past window. Plan today/forward. (2) `resolve_work_item_id` can only find an
+Opgave the planner **already surfaces** for the employee; a bare 0-hour v1
+`POST /allocation {UserId, TaskId}` to a leaf task does **not** make it appear as its own
+work-item row (it rolls up under the project), so `plan_resource_hours` throws
+`workItemNotFound` for such tasks. Plan against a work item the employee is genuinely
+planned on (the proven test work item: TaskID 1034 "TEST Aggersvolg Gods" →
+workItemId `512272894491885569`; `value` 2 over two days → `TotalBooked` 0→2).
