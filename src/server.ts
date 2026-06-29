@@ -2,7 +2,7 @@ import express, { type Request, type Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { TimeLogClient } from "./client.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, type Config } from "./config.js";
 import { registerTools } from "./registerTools.js";
 
 export function resolvePat(
@@ -15,10 +15,30 @@ export function resolvePat(
   return env.TIMELOG_PAT ?? null;
 }
 
+// Stateless transport options. On a shared deployment, ALLOWED_HOSTS turns on the SDK's
+// DNS-rebinding protection (rejects requests whose Host header isn't allow-listed); with
+// no allowedHosts the protection stays off so local runs on localhost just work.
+export function transportOptions(config: Config) {
+  if (config.allowedHosts) {
+    return {
+      sessionIdGenerator: undefined,
+      enableDnsRebindingProtection: true,
+      allowedHosts: config.allowedHosts,
+    };
+  }
+  return { sessionIdGenerator: undefined };
+}
+
 export function createApp() {
   const config = loadConfig();
   const app = express();
   app.use(express.json());
+
+  // Liveness probe for the Windows service / Docker healthcheck / load balancer.
+  // No PAT required — it touches nothing and reveals nothing sensitive.
+  app.get("/health", (_req: Request, res: Response) => {
+    res.json({ status: "ok" });
+  });
 
   app.post("/mcp", async (req: Request, res: Response) => {
     const pat = resolvePat(req.header("authorization"), process.env);
@@ -31,7 +51,7 @@ export function createApp() {
     const server = new McpServer({ name: "timelog-mcp", version: "0.1.0" });
     registerTools(server, client);
 
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+    const transport = new StreamableHTTPServerTransport(transportOptions(config));
     res.on("close", () => {
       void transport.close();
       void server.close();
