@@ -142,6 +142,22 @@ export async function fetchResourcePlan(
     }));
 }
 
+// book-hours clamps the period start to *today*, so a window whose END is before today
+// inverts and the API rejects it with a misleading 500 "end date is before start date"
+// (proven 2026-06-29). Guard up front with a clear message — applies to preview and
+// execute. A period that merely STARTS in the past but ends today/later is fine (the
+// clamp just moves the start forward). Date-only comparison; `today` is injected for tests.
+export function assertPlannablePeriod(period: PlannerPeriod, today: Date): void {
+  const end = period.endsAt.slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+  if (end < todayStr) {
+    throw new Error(
+      `Kan ikke planlægge i en periode der slutter før i dag (${end} < ${todayStr}). ` +
+        `Ressourceplanlæggeren afviser fortidige perioder — vælg en periode der ligger i dag eller frem.`,
+    );
+  }
+}
+
 export interface BookHoursInput {
   resourceId: string;
   workItemId: string;

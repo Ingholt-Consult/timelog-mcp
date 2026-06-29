@@ -7,6 +7,7 @@ import {
   bookHoursBody,
   bookHours,
   workItemNotFound,
+  assertPlannablePeriod,
   type PlannerPeriod,
 } from "./resourcePlanner.js";
 
@@ -24,13 +25,17 @@ export const resourceWriteTools: ToolDef[] = [
   {
     name: "plan_resource_hours",
     description:
-      "Plan hours for an Employee (Medarbejder) on a Task (Opgave) over a period in the Ressourceplanlægger (preview-and-confirm). Resolves the opaque Resource Planner ids from UserID/TaskID itself. value = TOTAL hours, distributed EVENLY per day across [startsAt, endsAt], and REPLACES any existing plan for this Employee+Opgave+period (not additive). mode=preview (default) writes NOTHING: it resolves the ids, reads the CURRENT plan for the Task, and returns that plus the exact payload and a warning that there is no DELETE. mode=execute books the hours (POST /api/v2/resource-planner/book-hours). One plan per call. The Opgave must already be planned for the Employee (allocated). This is the Resource Planner — distinct from the dead /workload/book Booking.",
+      "Plan hours for an Employee (Medarbejder) on a Task (Opgave) over a period in the Ressourceplanlægger (preview-and-confirm). Resolves the opaque Resource Planner ids from UserID/TaskID itself. value = TOTAL hours, distributed EVENLY per day across [startsAt, endsAt], and REPLACES any existing plan for this Employee+Opgave+period (not additive). mode=preview (default) writes NOTHING: it resolves the ids, reads the CURRENT plan for the Task, and returns that plus the exact payload and a warning that there is no DELETE. mode=execute books the hours (POST /api/v2/resource-planner/book-hours). One plan per call. The Opgave must already be planned for the Employee (allocated). The period must end today or later — the planner rejects fully past periods. This is the Resource Planner — distinct from the dead /workload/book Booking.",
     inputSchema: planResourceHoursShape,
     handler: async (client, args) => {
       const userId = args.UserID as number;
       const taskId = args.TaskID as number;
       const value = args.value as number;
       const period: PlannerPeriod = { startsAt: args.startsAt as string, endsAt: args.endsAt as string };
+
+      // Reject a fully-past period before resolving/writing: book-hours would otherwise
+      // 500 with a misleading "end date is before start date" (proven 2026-06-29).
+      assertPlannablePeriod(period, new Date());
 
       // Resolve the opaque v2 ids from the v1 ids: resourceId per employee, workItemId
       // per task. One employee-grouped read + one work-item-grouped read.

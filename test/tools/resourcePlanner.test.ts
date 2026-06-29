@@ -5,6 +5,7 @@ import {
   resolveWorkItemId,
   fetchResourcePlan,
   bookHours,
+  assertPlannablePeriod,
 } from "../../src/tools/resourcePlanner.js";
 import type { TimeLogClient } from "../../src/client.js";
 
@@ -147,6 +148,36 @@ describe("fetchResourcePlan", () => {
       {},
       expect.objectContaining({ periodtypes: "week", reportingtypes: "eac", unittypes: "hours" }),
     );
+  });
+});
+
+describe("assertPlannablePeriod", () => {
+  // book-hours clamps the period start to today, so a fully-past window inverts into
+  // a 500 "end date is before start date". Reject it up front with a clear message.
+  const today = new Date("2026-06-29T09:00:00Z");
+
+  it("throws when the period ends before today", () => {
+    expect(() =>
+      assertPlannablePeriod({ startsAt: "2026-06-22T00:00:00", endsAt: "2026-06-23T00:00:00" }, today),
+    ).toThrow(/i dag/i);
+  });
+
+  it("allows a period ending today", () => {
+    expect(() =>
+      assertPlannablePeriod({ startsAt: "2026-06-29T00:00:00", endsAt: "2026-06-29T00:00:00" }, today),
+    ).not.toThrow();
+  });
+
+  it("allows a future period", () => {
+    expect(() =>
+      assertPlannablePeriod({ startsAt: "2026-07-01T00:00:00", endsAt: "2026-07-05T00:00:00" }, today),
+    ).not.toThrow();
+  });
+
+  it("allows a period that starts in the past but ends today/later (book-hours clamps start to today)", () => {
+    expect(() =>
+      assertPlannablePeriod({ startsAt: "2026-06-01T00:00:00", endsAt: "2026-06-30T00:00:00" }, today),
+    ).not.toThrow();
   });
 });
 

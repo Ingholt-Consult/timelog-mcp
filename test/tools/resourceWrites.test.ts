@@ -42,13 +42,15 @@ function makeClient() {
   return { client: { postV2 } as unknown as TimeLogClient, postV2, calls };
 }
 
+// Far-future dates so the past-period guard never trips these flow tests (and they
+// stay deterministic as real time moves). The guard itself is unit-tested separately.
 const fullArgs = (mode: string) => ({
   mode,
   UserID: 29,
   TaskID: 4961,
   value: 8,
-  startsAt: "2026-06-22T00:00:00",
-  endsAt: "2026-06-26T00:00:00",
+  startsAt: "2099-06-22T00:00:00",
+  endsAt: "2099-06-26T00:00:00",
 });
 
 describe("resource write tools", () => {
@@ -84,8 +86,8 @@ describe("resource write tools", () => {
       workItemId: "WI-4961",
       unitType: "hours",
       value: "8",
-      startsAt: "2026-06-22T00:00:00",
-      endsAt: "2026-06-26T00:00:00",
+      startsAt: "2099-06-22T00:00:00",
+      endsAt: "2099-06-26T00:00:00",
     });
     expect(result.note).toMatch(/erstatter|replace/i);
   });
@@ -101,8 +103,8 @@ describe("resource write tools", () => {
       workItemId: "WI-4961",
       unitType: "hours",
       value: "8",
-      startsAt: "2026-06-22T00:00:00",
-      endsAt: "2026-06-26T00:00:00",
+      startsAt: "2099-06-22T00:00:00",
+      endsAt: "2099-06-26T00:00:00",
     });
     expect(result).toBe("OK");
   });
@@ -122,5 +124,19 @@ describe("resource write tools", () => {
     await expect(
       byName("plan_resource_hours").handler(client, { ...fullArgs("preview"), TaskID: 1234 }),
     ).rejects.toThrow(/1234/);
+  });
+
+  it("rejects a period that ends before today instead of surfacing the raw book-hours 500", async () => {
+    const { client, calls } = makeClient();
+
+    await expect(
+      byName("plan_resource_hours").handler(client, {
+        ...fullArgs("execute"),
+        startsAt: "2020-01-01T00:00:00",
+        endsAt: "2020-01-05T00:00:00",
+      }),
+    ).rejects.toThrow(/i dag/i);
+    // Guarded before any write.
+    expect(calls.some((c) => c.path.includes("book-hours"))).toBe(false);
   });
 });
