@@ -176,6 +176,22 @@ though `TotalRecord` is higher — this is by design, not a bug. Example:
 `$skip`/`$top`, headers, etc. are ignored — only the `$page`/`$pagesize` form
 works. Always pass `$pagesize` when you need a full list.
 
+Confirmed live against ingholtconsult2 (2026-06-29): `/customer` returns 10 rows
+unpaged vs 100 with `$pagesize=100` (`TotalRecord` 589), and `/user` 10 vs 63 —
+so the cap is real on the relation endpoints too. Two quirks to code around:
+`TotalRecord` is serialised as a **string** (`"589"`, not `589`) — coerce before
+comparing; and `/contact` **ignores `$pagesize`** entirely, returning every row
+(469) in one response while reporting `TotalRecord=0`.
+
+**Tool convention for this server.** Whole-list "resolve name → ID" lookups
+(`list_customers`/`list_contacts`/`list_users`, `list_project_types`/`categories`/
+`list_departments`, and the construction `list_*` tools) default to
+`$pagesize=1000` so the full list comes back in one call — a 100-row default
+silently truncates `/customer` (589) and a large project's `list_tasks` tree.
+`list_projects` is the exception: it is a large, iterated list, so it exposes
+explicit `page`/`pageSize` params (default `$pagesize=100`) and returns the raw
+response so `TotalRecord`/`TotalPage`/`PageNumber` stay visible for paging.
+
 **PUT is a full replace**, not a partial update — read-modify-write the whole
 model (see ADR 0005).
 
