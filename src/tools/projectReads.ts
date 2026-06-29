@@ -9,15 +9,27 @@ export const projectReadTools: ToolDef[] = [
     // API returns an array. We pass the JSON through verbatim — do not "fix" this
     // into single-object handling (see Phase 1 spec, caveat 3).
     description:
-      "List projects. Optional filters: customerID (only that customer's projects) and isActive (true = active projects only). Returns the raw TimeLog project list.",
+      "List projects. Optional filters: customerID (only that customer's projects) and isActive (true = active projects only). " +
+      "Paging: TimeLog silently caps the list at 10 rows unless paged, so this passes pageSize (default 100) as the $pagesize " +
+      "query option; set page to fetch later pages. The response's Properties carries TotalRecord/TotalPage/PageNumber so you " +
+      "can tell how many pages exist. Returns the raw TimeLog project list.",
     inputSchema: {
       customerID: z.number().int().optional().describe("Only projects for this CustomerID."),
       isActive: z.boolean().optional().describe("If set, filter by active/inactive projects."),
+      page: z.number().int().positive().optional().describe("1-based page number (TimeLog $page). Omit for page 1."),
+      pageSize: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe("Rows per page (TimeLog $pagesize). Defaults to 100 to avoid the silent 10-row cap."),
     },
     handler: (client, args) =>
       client.get("/project/get-all", {
         customerID: args.customerID as number | undefined,
         isActive: args.isActive as boolean | undefined,
+        $page: args.page as number | undefined,
+        $pagesize: (args.pageSize as number | undefined) ?? 100,
       }),
   },
   {
