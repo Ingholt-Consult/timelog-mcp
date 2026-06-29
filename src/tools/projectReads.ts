@@ -2,6 +2,12 @@ import { z } from "zod";
 import type { ToolDef } from "./types.js";
 import { unwrapList } from "./unwrap.js";
 
+// Whole-list classification lookups page with a generous $pagesize to fetch the
+// full list in one call (TimeLog silently caps at 10 rows without $-paging).
+// list_projects is different: it's a large, iterated list, so it exposes
+// page/pageSize with a 100-row default instead (see CONTEXT.md › API conventions).
+const WHOLE_LIST_PAGESIZE = 1000;
+
 export const projectReadTools: ToolDef[] = [
   {
     name: "list_projects",
@@ -46,9 +52,7 @@ export const projectReadTools: ToolDef[] = [
       "List all Project Types (read-only classification) to resolve a type name to its ProjectTypeID. Returns the full list, sorted by name.",
     inputSchema: {},
     handler: async (client) => {
-      // TimeLog list endpoints silently cap at 10 rows unless paged with $-options;
-      // $pagesize=100 returns the full list (see CONTEXT.md > API conventions).
-      const types = unwrapList(await client.get("/ProjectType", { $pagesize: 100 }));
+      const types = unwrapList(await client.get("/ProjectType", { $pagesize: WHOLE_LIST_PAGESIZE }));
       return types.sort((a, b) => String(a.Name ?? "").localeCompare(String(b.Name ?? ""), "da"));
     },
   },
@@ -57,12 +61,12 @@ export const projectReadTools: ToolDef[] = [
     description:
       "List all Project Categories (read-only classification, distinct from Project Type). Resolve a category name to its ProjectCategoryID.",
     inputSchema: {},
-    handler: (client) => client.get("/ProjectCategory", { $pagesize: 100 }),
+    handler: (client) => client.get("/ProjectCategory", { $pagesize: WHOLE_LIST_PAGESIZE }),
   },
   {
     name: "list_departments",
     description: "List all Departments. Resolve a department name to its DepartmentID.",
     inputSchema: {},
-    handler: (client) => client.get("/department", { $pagesize: 100 }),
+    handler: (client) => client.get("/department", { $pagesize: WHOLE_LIST_PAGESIZE }),
   },
 ];

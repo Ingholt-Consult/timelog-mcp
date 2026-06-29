@@ -28,7 +28,7 @@ describe("construction read tools", () => {
     const get = vi.fn(async () => ({ Entities: [{ Properties: { TaskID: 5 } }] }));
     const client = { get } as unknown as TimeLogClient;
     const result = await byName("list_tasks").handler(client, { projectID: 7 });
-    expect(get).toHaveBeenCalledWith("/task", { projectID: 7, $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/task", { projectID: 7, $pagesize: 1000 });
     expect(result).toEqual([{ TaskID: 5 }]);
   });
 
@@ -36,7 +36,7 @@ describe("construction read tools", () => {
     const get = vi.fn(async () => ({ Entities: [{ Properties: { TaskTypeID: 1, Name: "1.1 Idéoplæg" } }] }));
     const client = { get } as unknown as TimeLogClient;
     const result = await byName("list_task_types").handler(client, {});
-    expect(get).toHaveBeenCalledWith("/TaskType", { $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/TaskType", { $pagesize: 1000 });
     expect(result).toEqual([{ TaskTypeID: 1, Name: "1.1 Idéoplæg" }]);
   });
 
@@ -44,21 +44,21 @@ describe("construction read tools", () => {
     const get = vi.fn(async () => ({ Entities: [] }));
     const client = { get } as unknown as TimeLogClient;
     await byName("list_contracts").handler(client, { projectID: 7 });
-    expect(get).toHaveBeenCalledWith("/contract", { projectID: 7, $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/contract", { projectID: 7, $pagesize: 1000 });
   });
 
   it("list_payments filters by contractID", async () => {
     const get = vi.fn(async () => ({ Entities: [] }));
     const client = { get } as unknown as TimeLogClient;
     await byName("list_payments").handler(client, { contractID: 12 });
-    expect(get).toHaveBeenCalledWith("/payment", { contractID: 12, $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/payment", { contractID: 12, $pagesize: 1000 });
   });
 
   it("list_contract_hourly_rates filters by contractID", async () => {
     const get = vi.fn(async () => ({ Entities: [] }));
     const client = { get } as unknown as TimeLogClient;
     await byName("list_contract_hourly_rates").handler(client, { contractID: 12 });
-    expect(get).toHaveBeenCalledWith("/contract-hourly-rate", { contractID: 12, $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/contract-hourly-rate", { contractID: 12, $pagesize: 1000 });
   });
 
   it("get_task fetches a single task by id (raw)", async () => {
@@ -79,7 +79,7 @@ describe("construction read tools", () => {
     const get = vi.fn(async () => ({ Entities: [{ Properties: { ProjectTemplateID: 7, Name: "Fastpris – Småsag" } }] }));
     const client = { get } as unknown as TimeLogClient;
     const result = await byName("list_project_templates").handler(client, {});
-    expect(get).toHaveBeenCalledWith("/project-template/get-all", { $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/project-template/get-all", { $pagesize: 1000 });
     expect(result).toEqual([{ ProjectTemplateID: 7, Name: "Fastpris – Småsag" }]);
   });
 });

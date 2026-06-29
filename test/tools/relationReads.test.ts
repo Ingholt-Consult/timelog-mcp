@@ -15,19 +15,20 @@ describe("relation read tools", () => {
     );
   });
 
-  // These lookups can exceed the silent 10-row cap (a real account has >10
-  // customers/contacts/users), so they expose page/pageSize and default $pagesize=100.
+  // These name->ID lookups can exceed the silent 10-row cap (a real account has
+  // hundreds of customers/contacts), so they expose page/pageSize and default
+  // $pagesize=1000 to fetch the whole list in one call for reliable resolution.
   it.each([
     ["list_customers", "/customer"],
     ["list_contacts", "/contact"],
     ["list_users", "/user"],
-  ])("%s defaults $pagesize to 100 so it is not capped at 10", async (name, path) => {
+  ])("%s defaults $pagesize to 1000 so name resolution sees the whole list", async (name, path) => {
     const get = vi.fn(async () => ({}));
     const client = { get } as unknown as TimeLogClient;
 
     await byName(name).handler(client, {});
 
-    expect(get).toHaveBeenCalledWith(path, { $page: undefined, $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith(path, { $page: undefined, $pagesize: 1000 });
   });
 
   it.each([

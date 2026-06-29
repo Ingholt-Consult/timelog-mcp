@@ -67,7 +67,7 @@ describe("project read tools", () => {
       Name: string;
     }[];
 
-    expect(get).toHaveBeenCalledWith("/ProjectType", { $pagesize: 100 });
+    expect(get).toHaveBeenCalledWith("/ProjectType", { $pagesize: 1000 });
     // Unwrapped from Entities[].Properties and sorted by name (Nybyg before Ombyg).
     expect(result.map((t) => t.ProjectTypeID)).toEqual([246, 249]);
   });

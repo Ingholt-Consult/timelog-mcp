@@ -2,16 +2,20 @@ import { z } from "zod";
 import type { ToolDef } from "./types.js";
 import { unwrapList } from "./unwrap.js";
 
-// List endpoints silently cap at 10 rows unless paged with $-options; $pagesize=100
-// returns the full list (see CONTEXT.md › API conventions). Single-record reads pass
-// the raw wrapped { Properties: {...} } through, consistent with get_project.
+// List endpoints silently cap at 10 rows unless paged with $-options. These are
+// whole-list lookups (e.g. a large project's task tree can exceed 100 tasks), so we
+// page with a generous $pagesize to fetch the full list in one call and avoid silent
+// truncation (see CONTEXT.md › API conventions). Single-record reads pass the raw
+// wrapped { Properties: {...} } through, consistent with get_project.
+const WHOLE_LIST_PAGESIZE = 1000;
+
 export const constructionReadTools: ToolDef[] = [
   {
     name: "list_project_templates",
     description:
       "List the account's Project Templates (read-only). Resolve a template name (e.g. 'Fastpris – Småsag') to its ProjectTemplateID for create_project_from_template. NOTE: the API cannot create, edit, or delete templates — that is a UI-only action.",
     inputSchema: {},
-    handler: async (client) => unwrapList(await client.get("/project-template/get-all", { $pagesize: 100 })),
+    handler: async (client) => unwrapList(await client.get("/project-template/get-all", { $pagesize: WHOLE_LIST_PAGESIZE })),
   },
   {
     name: "list_tasks",
@@ -21,7 +25,7 @@ export const constructionReadTools: ToolDef[] = [
       projectID: z.number().int().describe("ProjectID whose tasks to list."),
     },
     handler: async (client, args) =>
-      unwrapList(await client.get("/task", { projectID: args.projectID as number, $pagesize: 100 })),
+      unwrapList(await client.get("/task", { projectID: args.projectID as number, $pagesize: WHOLE_LIST_PAGESIZE })),
   },
   {
     name: "get_task",
@@ -36,7 +40,7 @@ export const constructionReadTools: ToolDef[] = [
     description:
       "List all Task Types — the firm's ydelsesfaser (e.g. '1.1 Idéoplæg' … '4.8 Certificering KK3'). Resolve a task-type name to its TaskTypeID.",
     inputSchema: {},
-    handler: async (client) => unwrapList(await client.get("/TaskType", { $pagesize: 100 })),
+    handler: async (client) => unwrapList(await client.get("/TaskType", { $pagesize: WHOLE_LIST_PAGESIZE })),
   },
   {
     name: "list_contracts",
@@ -45,7 +49,7 @@ export const constructionReadTools: ToolDef[] = [
       projectID: z.number().int().describe("ProjectID whose contracts to list."),
     },
     handler: async (client, args) =>
-      unwrapList(await client.get("/contract", { projectID: args.projectID as number, $pagesize: 100 })),
+      unwrapList(await client.get("/contract", { projectID: args.projectID as number, $pagesize: WHOLE_LIST_PAGESIZE })),
   },
   {
     name: "get_contract",
@@ -63,7 +67,7 @@ export const constructionReadTools: ToolDef[] = [
       contractID: z.number().int().describe("ContractID whose payments to list."),
     },
     handler: async (client, args) =>
-      unwrapList(await client.get("/payment", { contractID: args.contractID as number, $pagesize: 100 })),
+      unwrapList(await client.get("/payment", { contractID: args.contractID as number, $pagesize: WHOLE_LIST_PAGESIZE })),
   },
   {
     name: "list_contract_hourly_rates",
@@ -73,6 +77,6 @@ export const constructionReadTools: ToolDef[] = [
       contractID: z.number().int().describe("ContractID whose hourly rates to list."),
     },
     handler: async (client, args) =>
-      unwrapList(await client.get("/contract-hourly-rate", { contractID: args.contractID as number, $pagesize: 100 })),
+      unwrapList(await client.get("/contract-hourly-rate", { contractID: args.contractID as number, $pagesize: WHOLE_LIST_PAGESIZE })),
   },
 ];

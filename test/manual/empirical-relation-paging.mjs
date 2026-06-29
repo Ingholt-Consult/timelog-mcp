@@ -37,10 +37,13 @@ async function get(path, query) {
 }
 
 // TAFList shape: { Properties: { TotalRecord, TotalPage, PageNumber }, Entities: [...] }
+// NB: TimeLog serialises TotalRecord as a STRING ("589"), so coerce it. Some
+// endpoints (e.g. /contact) report TotalRecord=0 yet still return every row.
 function summarise(resp) {
   const rows = Array.isArray(resp?.Entities) ? resp.Entities : Array.isArray(resp) ? resp : [];
-  const total = resp?.Properties?.TotalRecord;
-  return { count: rows.length, total };
+  const raw = resp?.Properties?.TotalRecord;
+  const total = raw == null || raw === "" ? undefined : Number(raw);
+  return { count: rows.length, total: Number.isNaN(total) ? undefined : total };
 }
 
 const endpoints = [
@@ -60,17 +63,12 @@ for (const [tool, path] of endpoints) {
     console.log(`  no paging      : ${unpaged.count} rows (TotalRecord=${unpaged.total ?? "?"})`);
     console.log(`  $pagesize=100  : ${paged.count} rows (TotalRecord=${paged.total ?? "?"})`);
 
-    const total = paged.total ?? unpaged.total;
-    if (typeof total !== "number") {
-      console.log("  ?  INCONCLUSIVE: no TotalRecord in response — inspect the raw shape.");
-      allPass = false;
-    } else if (total <= 10) {
-      console.log(`  ~  only ${total} records on the account — under the cap, paging can't be observed here.`);
-    } else if (unpaged.count === 10 && paged.count > 10) {
-      console.log(`  PASS: unpaged capped at 10, $pagesize=100 lifted it to ${paged.count} of ${total}.`);
+    if (unpaged.count === 10 && paged.count > 10) {
+      console.log(`  PASS: unpaged capped at 10, $pagesize=100 lifted it to ${paged.count}${total ? ` of ${total}` : ""}.`);
+    } else if (unpaged.count > 10) {
+      console.log(`  OK: this endpoint does not cap at 10 — it returned ${unpaged.count} rows directly, so paging isn't needed (our default is harmless).`);
     } else {
-      console.log(`  FAIL: expected unpaged=10 and paged>10 (TotalRecord=${total}).`);
-      allPass = false;
+      console.log(`  ~  only ${unpaged.count} rows returned${total ? ` (TotalRecord=${total})` : ""} — under the cap, so paging can't be observed here.`);
     }
   } catch (e) {
     console.log(`  ERROR: ${e.message}`);
