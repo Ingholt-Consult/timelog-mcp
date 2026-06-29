@@ -15,10 +15,13 @@
 //   # Dry — resolve ids + read the current plan (no write):
 //   node test/manual/empirical-plan-resource-hours.mjs
 //
-//   # ONE real plan (default UserID 29 / TaskID 4961 on test project 1034):
-//   $env:DO_PLAN_HOURS="1"; node test/manual/empirical-plan-resource-hours.mjs
+//   # ONE real plan (default UserID 29 / TaskID 4961 on test project 1034). If the task
+//   # is no longer allocated to the user, DO_ALLOCATE=1 re-adds it (0h) first:
+//   $env:DO_ALLOCATE="1"; $env:DO_PLAN_HOURS="1"; node test/manual/empirical-plan-resource-hours.mjs
 //   # optional overrides: PLAN_USER_ID, PLAN_TASK_ID, PLAN_VALUE (default 2),
 //   #                     PLAN_START (2026-06-22), PLAN_END (2026-06-23)
+//   # NB: defaults plan into the week of 22-23 Jun (now past). If book-hours rejects a
+//   #     past week, override PLAN_START/PLAN_END to a current/future week.
 
 const baseUrl = process.env.TIMELOG_BASE_URL?.replace(/\/+$/, "");
 const pat = process.env.TIMELOG_PAT;
@@ -63,6 +66,19 @@ const resNode = flatten(resText).find((n) => Number(n.resourceSourceReferenceId)
 const resourceId = resNode?.resourceId;
 console.log(`  >> UserID ${userId} → resourceId ${resourceId ?? "(NOT FOUND — is the employee a resource in this period?)"}`);
 
+// 1b. OPTIONAL: (re)establish UserID as a resource on the task so it shows up in the
+// plan. v1 POST /allocation {UserId, TaskId} adds the employee at 0 allocated hours
+// (proven in the gate); book-hours then sets the actual hours. Guarded — it writes.
+if (process.env.DO_ALLOCATE === "1") {
+  const allocRes = await fetch(`${baseUrl}/allocation`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ UserId: userId, TaskId: taskId }),
+  });
+  console.log(`\n=== allocation: add UserID ${userId} to TaskID ${taskId} (${allocRes.status}) ===  POST ${baseUrl}/allocation`);
+  if (allocRes.status !== 200) console.log((await allocRes.text()).slice(0, 600));
+}
+
 // 2. workItemId + the CURRENT plan for the task (what preview shows).
 const wiText = await call("partial-group-by-work-item", `${rp}/partial-group-by-work-item?groupedby=groupbyworkitem&${period}`, {});
 const wiNode = flatten(wiText).find((n) => Number(n.workItemSourceReferenceId) === taskId);
@@ -72,23 +88,32 @@ if (wiNode) {
   console.log(`  >> TaskID ${taskId} → workItemId ${workItemId} | TotalBooked=${wiNode.TotalBooked} | per-period ${per}`);
 } else {
   console.log(`  >> TaskID ${taskId} NOT FOUND — must be planned for the employee (allocation) and hit the period.`);
+  // Show what UserID IS planned on so a valid PLAN_TASK_ID can be picked (read-only).
+  const rows = flatten(wiText).filter((n) => n.workItemSourceReferenceId != null && Number(n.workItemSourceReferenceId) !== 0);
+  if (rows.length) {
+    console.log(`  Work items UserID ${userId} IS planned on this period (set PLAN_TASK_ID to one of these):`);
+    for (const r of rows) console.log(`     TaskID ${r.workItemSourceReferenceId} | ${r.name ?? "?"} | workItemId ${r.workItemId}`);
+  } else {
+    console.log(`  (UserID ${userId} has NO planned work items in this period — run once with DO_ALLOCATE=1, or allocate in the UI first.)`);
+  }
 }
 
 // 3. OPTIONAL real plan — only with DO_PLAN_HOURS=1 and both ids resolved.
 if (process.env.DO_PLAN_HOURS === "1") {
   if (!resourceId || !workItemId) {
-    console.error("\nCannot plan: resourceId/workItemId not resolved (see above).");
-    process.exit(1);
+    // Graceful skip — no process.exit (it raced libuv on exit and crashed on Windows).
+    console.error("\nCannot plan: resourceId/workItemId not resolved (see above). Re-run with DO_ALLOCATE=1, or set PLAN_TASK_ID to a task UserID is planned on.");
+  } else {
+    await call("book-hours: REAL (REPLACE)", `${rp}/book-hours`, {
+      resourceId, workItemId, unitType: "hours", value, startsAt, endsAt,
+    });
+    console.log(`\nPlanned value=${value} over ${startsAt.slice(0, 10)}..${endsAt.slice(0, 10)} (REPLACE; ${value}h spread evenly per day).`);
+    const afterText = await call("partial-group-by-work-item AFTER", `${rp}/partial-group-by-work-item?groupedby=groupbyworkitem&${period}`, {});
+    const after = flatten(afterText).find((n) => Number(n.workItemSourceReferenceId) === taskId);
+    const per = Object.entries(after?.values ?? {}).map(([k, v]) => `${k}=${v.value}`).join(" ");
+    console.log(`  >> TaskID ${taskId} now: TotalBooked=${after?.TotalBooked} | per-period ${per}`);
+    console.log("\n>>> Verify in the Resource Planner UI and REMOVE/zero it manually (no DELETE).");
   }
-  await call("book-hours: REAL (REPLACE)", `${rp}/book-hours`, {
-    resourceId, workItemId, unitType: "hours", value, startsAt, endsAt,
-  });
-  console.log(`\nPlanned value=${value} over ${startsAt.slice(0, 10)}..${endsAt.slice(0, 10)} (REPLACE; ${value}h spread evenly per day).`);
-  const afterText = await call("partial-group-by-work-item AFTER", `${rp}/partial-group-by-work-item?groupedby=groupbyworkitem&${period}`, {});
-  const after = flatten(afterText).find((n) => Number(n.workItemSourceReferenceId) === taskId);
-  const per = Object.entries(after?.values ?? {}).map(([k, v]) => `${k}=${v.value}`).join(" ");
-  console.log(`  >> TaskID ${taskId} now: TotalBooked=${after?.TotalBooked} | per-period ${per}`);
-  console.log("\n>>> Verify in the Resource Planner UI and REMOVE/zero it manually (no DELETE).");
 }
 
 console.log("\nDone. Reads only unless DO_PLAN_HOURS=1.");

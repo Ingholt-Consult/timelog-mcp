@@ -63,6 +63,7 @@ for (const [tool, path] of endpoints) {
     console.log(`  no paging      : ${unpaged.count} rows (TotalRecord=${unpaged.total ?? "?"})`);
     console.log(`  $pagesize=100  : ${paged.count} rows (TotalRecord=${paged.total ?? "?"})`);
 
+    const total = paged.total ?? unpaged.total;
     if (unpaged.count === 10 && paged.count > 10) {
       console.log(`  PASS: unpaged capped at 10, $pagesize=100 lifted it to ${paged.count}${total ? ` of ${total}` : ""}.`);
     } else if (unpaged.count > 10) {
